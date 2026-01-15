@@ -1,8 +1,5 @@
-// This is your Prisma schema file,
-// learn more about it in the docs: https://pris.ly/d/prisma-schema
-
-// Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
-// Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+// CollabOS+ Prisma Schema
+// Production-ready schema for AI-powered collaborative workspace
 
 generator client {
   provider = "prisma-client-js"
@@ -11,21 +8,305 @@ generator client {
 
 datasource db {
   provider = "postgresql"
-  url      = env("DATABASE_URL")
 }
 
+// ============================================
+// USER & AUTHENTICATION
+// ============================================
 
 model User {
   id         String   @id @default(cuid())
-  name       String
+  clerkId    String   @unique // Clerk user ID
+  firstName  String
+  middleName String?
+  lastName   String
   email      String   @unique
-  password   String
-  role       String?
-  dob        DateTime?
-  avatarUrl  String?
-  tier       String   @default("Free")
+  phone      String?  @unique
+  address    String?
+  avatar     String?
+  tier       String   @default("Free") // Free, Pro, Elite, Legend
   coins      Int      @default(0)
-  isVerified Boolean  @default(false)
   createdAt  DateTime @default(now())
   updatedAt  DateTime @updatedAt
+
+  // Relations
+  workspaces      WorkspaceMember[]
+  ownedWorkspaces Workspace[]       @relation("WorkspaceOwner")
+  tasks           Task[]            @relation("TaskAssigned")
+  createdTasks    Task[]            @relation("TaskCreator")
+  points          UserPoints?
+  subscriptions   Subscription[]
+  notifications   Notification[]
+  automations     Automation[]
+  documents       Document[]
+  chatMessages    ChatMessage[]
+  coinHistory     CoinTransaction[]
+
+  @@index([clerkId])
+  @@index([email])
+}
+
+// ============================================
+// WORKSPACE & COLLABORATION
+// ============================================
+
+model Workspace {
+  id          String   @id @default(cuid())
+  name        String
+  slug        String   @unique
+  description String?
+  ownerId     String
+  settings    Json? // Theme, preferences, etc.
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  // Relations
+  owner     User              @relation("WorkspaceOwner", fields: [ownerId], references: [id])
+  members   WorkspaceMember[]
+  projects  Project[]
+  documents Document[]
+  chats     Chat[]
+
+  @@index([ownerId])
+  @@index([slug])
+}
+
+model WorkspaceMember {
+  id          String   @id @default(cuid())
+  workspaceId String
+  userId      String
+  role        String   @default("member") // owner, admin, member, viewer
+  joinedAt    DateTime @default(now())
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  user      User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, userId])
+  @@index([workspaceId])
+  @@index([userId])
+}
+
+// ============================================
+// PROJECTS & TASKS
+// ============================================
+
+model Project {
+  id          String    @id @default(cuid())
+  name        String
+  description String?
+  workspaceId String
+  status      String    @default("active") // active, completed, archived
+  deadline    DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks     Task[]
+
+  @@index([workspaceId])
+  @@index([status])
+}
+
+model Task {
+  id          String    @id @default(cuid())
+  title       String
+  description String?
+  status      String    @default("pending") // pending, in_progress, completed, cancelled
+  priority    String    @default("medium") // low, medium, high, urgent
+  deadline    DateTime?
+  projectId   String
+  assignedTo  String?
+  createdById String
+  completedAt DateTime?
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  project  Project @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee User?   @relation("TaskAssigned", fields: [assignedTo], references: [id])
+  creator  User    @relation("TaskCreator", fields: [createdById], references: [id])
+
+  @@index([projectId])
+  @@index([assignedTo])
+  @@index([status])
+  @@index([deadline])
+}
+
+// ============================================
+// DOCUMENTS (Real-time Collaboration)
+// ============================================
+
+model Document {
+  id               String   @id @default(cuid())
+  title            String
+  content          String? // JSON content for rich text
+  workspaceId      String
+  createdById      String
+  isPublic         Boolean  @default(false)
+  liveblocksRoomId String?  @unique
+  createdAt        DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  creator   User      @relation(fields: [createdById], references: [id])
+
+  @@index([workspaceId])
+  @@index([createdById])
+}
+
+// ============================================
+// CHAT & MESSAGING
+// ============================================
+
+model Chat {
+  id          String   @id @default(cuid())
+  name        String?
+  workspaceId String
+  type        String   @default("channel") // channel, direct, group
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  workspace Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  messages  ChatMessage[]
+
+  @@index([workspaceId])
+}
+
+model ChatMessage {
+  id        String   @id @default(cuid())
+  chatId    String
+  userId    String
+  content   String
+  edited    Boolean  @default(false)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  chat Chat @relation(fields: [chatId], references: [id], onDelete: Cascade)
+  user User @relation(fields: [userId], references: [id])
+
+  @@index([chatId])
+  @@index([userId])
+  @@index([createdAt])
+}
+
+// ============================================
+// COIN SYSTEM & POINTS
+// ============================================
+
+model UserPoints {
+  userId      String   @id
+  coins       Int      @default(0)
+  totalEarned Int      @default(0)
+  totalSpent  Int      @default(0)
+  tier        String   @default("Free")
+  updatedAt   DateTime @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model CoinTransaction {
+  id          String   @id @default(cuid())
+  userId      String
+  amount      Int // positive for earned, negative for spent
+  type        String // task_completed, ai_used, project_completed, invite, automation, subscription
+  description String?
+  metadata    Json? // Additional context
+  createdAt   DateTime @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([type])
+  @@index([createdAt])
+}
+
+// ============================================
+// SUBSCRIPTIONS & BILLING
+// ============================================
+
+model Subscription {
+  id                   String    @id @default(cuid())
+  userId               String
+  plan                 String // Free, Pro, Elite, Legend
+  stripeCustomerId     String?   @unique
+  stripeSubscriptionId String?   @unique
+  status               String    @default("active") // active, cancelled, past_due
+  coinsUsed            Int       @default(0) // Coins used in this billing cycle
+  amountPaid           Decimal? // Amount paid via Stripe (in cents)
+  currentPeriodStart   DateTime?
+  currentPeriodEnd     DateTime?
+  renewalDate          DateTime
+  cancelledAt          DateTime?
+  createdAt            DateTime  @default(now())
+  updatedAt            DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([status])
+  @@index([renewalDate])
+}
+
+// ============================================
+// NOTIFICATIONS
+// ============================================
+
+model Notification {
+  id        String    @id @default(cuid())
+  userId    String
+  type      String // task_assigned, task_completed, project_deadline, coin_earned, etc.
+  title     String
+  message   String
+  link      String? // URL to related resource
+  read      Boolean   @default(false)
+  readAt    DateTime?
+  metadata  Json? // Additional data
+  createdAt DateTime  @default(now())
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([read])
+  @@index([createdAt])
+}
+
+// ============================================
+// AUTOMATION ENGINE
+// ============================================
+
+model Automation {
+  id          String    @id @default(cuid())
+  userId      String
+  workspaceId String?
+  name        String
+  description String?
+  trigger     Json // Trigger configuration
+  conditions  Json? // Conditional logic
+  actions     Json // Actions to execute
+  enabled     Boolean   @default(true)
+  lastRunAt   DateTime?
+  runCount    Int       @default(0)
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@index([userId])
+  @@index([workspaceId])
+  @@index([enabled])
+}
+
+// ============================================
+// AI SEARCH & EMBEDDINGS
+// ============================================
+
+model DocumentEmbedding {
+  id         String                 @id @default(cuid())
+  documentId String? // Can be document, task, project, etc.
+  entityType String // document, task, project, message
+  content    String // Original content
+  embedding  Unsupported("vector")? // pgvector embedding
+  metadata   Json?
+  createdAt  DateTime               @default(now())
+
+  @@index([documentId, entityType])
 }
