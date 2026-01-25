@@ -5,17 +5,17 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { Mail, Lock, User, ArrowRight } from "lucide-react";
+import {
+  Mail,
+  Lock,
+  User,
+  ArrowRight,
+  Sparkles,
+  CheckCircle,
+} from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import {
-  Card,
-  CardContent,
-  CardDescription,
-  CardHeader,
-  CardTitle,
-} from "@/components/ui/card";
 import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 
 export default function SignUpPage() {
@@ -42,13 +42,13 @@ export default function SignUpPage() {
 
       if (!response.ok) {
         toast.error("Sign up failed", {
-          description: data.error || "Could not create your account.",
+          description: data.error || "Please check your information.",
         });
         return;
       }
 
       toast.success("Account created!", {
-        description: "Welcome to CollabOS+. Redirecting to dashboard...",
+        description: "Welcome to CollabOS+. Let's get started!",
       });
       router.push("/dashboard");
       router.refresh();
@@ -80,8 +80,8 @@ export default function SignUpPage() {
         return;
       }
 
-      toast.success("Account created!", {
-        description: "Welcome to CollabOS+. Redirecting to dashboard...",
+      toast.success("Welcome to CollabOS+!", {
+        description: "Your account has been created successfully.",
       });
       router.push("/dashboard");
       router.refresh();
@@ -94,176 +94,267 @@ export default function SignUpPage() {
     }
   };
 
+  const features = [
+    "Unlimited projects & tasks",
+    "Real-time team collaboration",
+    "Advanced analytics & insights",
+  ];
+
   return (
-    <div className="flex min-h-screen items-center justify-center px-4">
-      <motion.div
-        initial={{ opacity: 0, y: 20, scale: 0.95 }}
-        animate={{ opacity: 1, y: 0, scale: 1 }}
-        transition={{ duration: 0.5, ease: "easeOut" }}
-        className="w-full max-w-md"
-      >
-        <Card className="transition-all duration-300 hover:shadow-xl hover:shadow-primary/10">
-          <CardHeader className="text-center">
+    <div className="flex min-h-screen bg-linear-to-br from-white via-blue-50/30 to-white">
+      {/* Left side - Form */}
+      <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
+        <motion.div
+          initial={{ opacity: 0, y: 20 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.5 }}
+          className="w-full max-w-md"
+        >
+          {/* Mobile logo */}
+          <Link href="/" className="lg:hidden inline-block mb-8">
             <motion.div
-              initial={{ opacity: 0, y: -10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.2 }}
+              whileHover={{ scale: 1.05 }}
+              className="flex items-center gap-2"
             >
-              <Link href="/" className="inline-block mb-4">
-                <motion.div
-                  whileHover={{ scale: 1.1, rotate: 5 }}
-                  whileTap={{ scale: 0.95 }}
-                  className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary text-primary-foreground text-lg font-bold mx-auto"
-                >
-                  C+
-                </motion.div>
-              </Link>
-              <CardTitle className="text-2xl font-bold">
-                Create an account
-              </CardTitle>
-              <CardDescription>Get started with CollabOS+</CardDescription>
+              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary text-primary-foreground font-bold shadow-md shadow-primary/20">
+                C+
+              </div>
+              <span className="text-xl font-bold">CollabOS+</span>
             </motion.div>
-          </CardHeader>
-          <CardContent>
-            <form onSubmit={handleSubmit} className="space-y-4">
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.3 }}
-                className="space-y-2"
-              >
-                <Label htmlFor="name">Name</Label>
-                <div className="relative">
-                  <User className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="name"
-                    type="text"
-                    placeholder="John Doe"
-                    value={formData.name}
-                    onChange={(e) =>
-                      setFormData({ ...formData, name: e.target.value })
-                    }
-                    required
-                    disabled={isLoading}
-                    className="pl-10"
-                  />
-                </div>
-              </motion.div>
+          </Link>
 
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.4 }}
-                className="space-y-2"
-              >
-                <Label htmlFor="email">Email</Label>
-                <div className="relative">
-                  <Mail className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="email"
-                    type="email"
-                    placeholder="you@example.com"
-                    value={formData.email}
-                    onChange={(e) =>
-                      setFormData({ ...formData, email: e.target.value })
-                    }
-                    required
-                    disabled={isLoading}
-                    className="pl-10"
-                  />
-                </div>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, x: -20 }}
-                animate={{ opacity: 1, x: 0 }}
-                transition={{ delay: 0.5 }}
-                className="space-y-2"
-              >
-                <Label htmlFor="password">Password</Label>
-                <div className="relative">
-                  <Lock className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    id="password"
-                    type="password"
-                    placeholder="••••••••"
-                    value={formData.password}
-                    onChange={(e) =>
-                      setFormData({ ...formData, password: e.target.value })
-                    }
-                    required
-                    minLength={8}
-                    disabled={isLoading}
-                    className="pl-10"
-                  />
-                </div>
-              </motion.div>
-
-              <motion.div
-                initial={{ opacity: 0, y: 10 }}
-                animate={{ opacity: 1, y: 0 }}
-                transition={{ delay: 0.6 }}
-              >
-                <motion.div
-                  whileHover={{ scale: 1.02 }}
-                  whileTap={{ scale: 0.98 }}
-                >
-                  <Button
-                    type="submit"
-                    className="w-full gap-2"
-                    disabled={isLoading}
-                  >
-                    {isLoading ? "Creating account..." : "Create account"}
-                    {!isLoading && <ArrowRight className="h-4 w-4" />}
-                  </Button>
-                </motion.div>
-              </motion.div>
-            </form>
-
-            <motion.div
+          <div className="mb-8">
+            <motion.h2
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
-              transition={{ delay: 0.7 }}
-              className="relative my-6"
+              transition={{ delay: 0.1 }}
+              className="text-3xl font-bold text-foreground mb-2"
             >
-              <div className="absolute inset-0 flex items-center">
-                <span className="w-full border-t" />
-              </div>
-              <div className="relative flex justify-center text-xs uppercase">
-                <span className="bg-card px-2 text-muted-foreground">
-                  Or continue with
-                </span>
+              Create your account
+            </motion.h2>
+            <motion.p
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.2 }}
+              className="text-muted-foreground"
+            >
+              Start your journey with CollabOS+ today
+            </motion.p>
+          </div>
+
+          <form onSubmit={handleSubmit} className="space-y-5">
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="space-y-2"
+            >
+              <Label htmlFor="name" className="text-sm font-medium">
+                Full name
+              </Label>
+              <div className="relative group">
+                <User className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                <Input
+                  id="name"
+                  type="text"
+                  placeholder="John Doe"
+                  value={formData.name}
+                  onChange={(e) =>
+                    setFormData({ ...formData, name: e.target.value })
+                  }
+                  required
+                  disabled={isLoading}
+                  className="pl-10 h-12 bg-white border-2 transition-all duration-200 focus:border-primary focus:ring-4 focus:ring-primary/10 hover:border-primary/50"
+                />
               </div>
             </motion.div>
 
             <motion.div
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.8 }}
+              transition={{ delay: 0.4 }}
+              className="space-y-2"
             >
-              <GoogleSignInButton
-                onSuccess={handleGoogleSuccess}
-                text="signup_with"
-              />
+              <Label htmlFor="email" className="text-sm font-medium">
+                Email address
+              </Label>
+              <div className="relative group">
+                <Mail className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                <Input
+                  id="email"
+                  type="email"
+                  placeholder="you@example.com"
+                  value={formData.email}
+                  onChange={(e) =>
+                    setFormData({ ...formData, email: e.target.value })
+                  }
+                  required
+                  disabled={isLoading}
+                  className="pl-10 h-12 bg-white border-2 transition-all duration-200 focus:border-primary focus:ring-4 focus:ring-primary/10 hover:border-primary/50"
+                />
+              </div>
             </motion.div>
 
-            <motion.p
-              initial={{ opacity: 0 }}
-              animate={{ opacity: 1 }}
-              transition={{ delay: 0.9 }}
-              className="mt-6 text-center text-sm text-muted-foreground"
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
+              className="space-y-2"
             >
-              Already have an account?{" "}
-              <Link
-                href="/sign-in"
-                className="font-medium text-primary hover:underline transition-colors"
+              <Label htmlFor="password" className="text-sm font-medium">
+                Password
+              </Label>
+              <div className="relative group">
+                <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
+                <Input
+                  id="password"
+                  type="password"
+                  placeholder="••••••••"
+                  value={formData.password}
+                  onChange={(e) =>
+                    setFormData({ ...formData, password: e.target.value })
+                  }
+                  required
+                  disabled={isLoading}
+                  className="pl-10 h-12 bg-white border-2 transition-all duration-200 focus:border-primary focus:ring-4 focus:ring-primary/10 hover:border-primary/50"
+                />
+              </div>
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.6 }}
+            >
+              <Button
+                type="submit"
+                className="w-full h-12 text-base font-medium"
+                disabled={isLoading}
               >
-                Sign in
-              </Link>
-            </motion.p>
-          </CardContent>
-        </Card>
-      </motion.div>
+                {isLoading ? (
+                  <span className="flex items-center gap-2">
+                    <motion.div
+                      animate={{ rotate: 360 }}
+                      transition={{
+                        duration: 1,
+                        repeat: Infinity,
+                        ease: "linear",
+                      }}
+                      className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full"
+                    />
+                    Creating account...
+                  </span>
+                ) : (
+                  <span className="flex items-center gap-2">
+                    Create account
+                    <ArrowRight className="h-4 w-4" />
+                  </span>
+                )}
+              </Button>
+            </motion.div>
+          </form>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.7 }}
+            className="relative my-8"
+          >
+            <div className="absolute inset-0 flex items-center">
+              <span className="w-full border-t-2" />
+            </div>
+            <div className="relative flex justify-center text-xs uppercase">
+              <span className="bg-linear-to-br from-white via-blue-50/30 to-white px-4 text-muted-foreground font-medium">
+                Or continue with
+              </span>
+            </div>
+          </motion.div>
+
+          <motion.div
+            initial={{ opacity: 0, y: 10 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ delay: 0.8 }}
+          >
+            <GoogleSignInButton
+              onSuccess={handleGoogleSuccess}
+              text="signup_with"
+            />
+          </motion.div>
+
+          <motion.p
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.9 }}
+            className="mt-8 text-center text-sm text-muted-foreground"
+          >
+            Already have an account?{" "}
+            <Link
+              href="/sign-in"
+              className="font-semibold text-primary hover:text-primary/80 transition-colors hover:underline underline-offset-4"
+            >
+              Sign in
+            </Link>
+          </motion.p>
+        </motion.div>
+      </div>
+
+      {/* Right side - Branding */}
+      <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-12 bg-linear-to-br from-primary/5 via-primary/10 to-primary/5">
+        <motion.div
+          initial={{ opacity: 0, x: 30 }}
+          animate={{ opacity: 1, x: 0 }}
+          transition={{ duration: 0.6 }}
+          className="max-w-md"
+        >
+          <Link href="/" className="inline-block mb-8">
+            <motion.div
+              whileHover={{ scale: 1.05, rotate: -3 }}
+              className="flex items-center gap-3"
+            >
+              <div className="flex h-14 w-14 items-center justify-center rounded-2xl bg-primary text-primary-foreground text-xl font-bold shadow-lg shadow-primary/25">
+                C+
+              </div>
+              <span className="text-2xl font-bold text-foreground">
+                CollabOS+
+              </span>
+            </motion.div>
+          </Link>
+          <h1 className="text-4xl font-bold text-foreground mb-4">
+            Start building with your team
+          </h1>
+          <p className="text-lg text-muted-foreground mb-8">
+            Join thousands of teams using CollabOS+ to ship faster and
+            collaborate better.
+          </p>
+
+          <div className="space-y-4">
+            {features.map((feature, index) => (
+              <motion.div
+                key={feature}
+                initial={{ opacity: 0, x: 20 }}
+                animate={{ opacity: 1, x: 0 }}
+                transition={{ delay: 0.3 + index * 0.1 }}
+                className="flex items-center gap-3"
+              >
+                <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary/10">
+                  <CheckCircle className="h-4 w-4 text-primary" />
+                </div>
+                <span className="text-foreground font-medium">{feature}</span>
+              </motion.div>
+            ))}
+          </div>
+
+          <motion.div
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            transition={{ delay: 0.7 }}
+            className="mt-8 flex items-center gap-2 text-sm text-muted-foreground"
+          >
+            <Sparkles className="h-4 w-4 text-primary" />
+            <span>Free 14-day trial, no credit card required</span>
+          </motion.div>
+        </motion.div>
+      </div>
     </div>
   );
 }

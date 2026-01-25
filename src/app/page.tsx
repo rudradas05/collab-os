@@ -3,7 +3,15 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { ArrowRight, Zap, Shield, Users, Sparkles, LogOut } from "lucide-react";
+import {
+  ArrowRight,
+  Zap,
+  Shield,
+  Users,
+  Sparkles,
+  LogOut,
+  CheckCircle,
+} from "lucide-react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
@@ -19,7 +27,6 @@ export default function Home() {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Check if user is logged in by making a request to get user info
     const checkAuth = async () => {
       try {
         const response = await fetch("/api/auth/me");
@@ -51,296 +58,256 @@ export default function Home() {
     }
   };
 
-  const containerVariants = {
-    hidden: { opacity: 0 },
-    visible: {
-      opacity: 1,
-      transition: {
-        staggerChildren: 0.1,
-        delayChildren: 0.2,
-      },
+  const features = [
+    {
+      icon: Zap,
+      title: "Lightning Fast",
+      description:
+        "Real-time updates and instant sync across all your devices.",
     },
-  };
-
-  const itemVariants = {
-    hidden: { opacity: 0, y: 20 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.5,
-        ease: "easeOut",
-      },
+    {
+      icon: Users,
+      title: "Team First",
+      description: "Work together seamlessly with your entire team.",
     },
-  };
-
-  const cardVariants = {
-    hidden: { opacity: 0, y: 30 },
-    visible: {
-      opacity: 1,
-      y: 0,
-      transition: {
-        duration: 0.6,
-        ease: "easeOut",
-      },
+    {
+      icon: Shield,
+      title: "Secure by Default",
+      description: "Enterprise-grade security for your data.",
     },
-    hover: {
-      y: -8,
-      transition: {
-        duration: 0.3,
-        ease: "easeOut",
-      },
-    },
-  };
+  ];
 
   return (
-    <div className="flex min-h-screen flex-col">
+    <div className="flex min-h-screen flex-col bg-linear-to-b from-white via-blue-50/20 to-white">
+      {/* Header */}
       <motion.header
         initial={{ opacity: 0, y: -20 }}
         animate={{ opacity: 1, y: 0 }}
-        transition={{ duration: 0.5 }}
-        className="sticky top-0 z-50 border-b bg-background/95 backdrop-blur supports-backdrop-filter:bg-background/60"
+        transition={{ duration: 0.4 }}
+        className="sticky top-0 z-50 border-b bg-white/80 backdrop-blur-lg"
       >
         <div className="container mx-auto flex h-16 items-center justify-between px-4">
-          <motion.div
-            whileHover={{ scale: 1.05 }}
-            whileTap={{ scale: 0.98 }}
-            className="flex items-center gap-2 font-bold text-xl cursor-pointer"
-          >
+          <Link href="/">
             <motion.div
-              whileHover={{
-                rotate: 5,
-                boxShadow: "0 10px 30px rgba(var(--primary), 0.3)",
-              }}
-              className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground text-sm transition-all duration-200"
+              whileHover={{ scale: 1.02 }}
+              className="flex items-center gap-2.5 font-bold text-xl cursor-pointer"
             >
-              C+
+              <div className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary text-primary-foreground text-sm font-bold shadow-md shadow-primary/20">
+                C+
+              </div>
+              <span className="text-foreground">CollabOS+</span>
             </motion.div>
-            CollabOS+
-          </motion.div>
-          <div className="flex items-center gap-4">
+          </Link>
+
+          <nav className="flex items-center gap-3">
             {!isLoading && (
               <>
                 {user ? (
                   <>
-                    <span className="text-sm text-muted-foreground hidden sm:inline">
-                      Welcome, {user.name}
+                    <span className="text-sm text-muted-foreground hidden md:inline">
+                      Welcome,{" "}
+                      <span className="font-medium text-foreground">
+                        {user.name}
+                      </span>
                     </span>
                     <Link href="/dashboard">
-                      <Button variant="ghost">Dashboard</Button>
+                      <Button variant="ghost" size="sm">
+                        Dashboard
+                      </Button>
                     </Link>
                     <Button
                       variant="outline"
+                      size="sm"
                       onClick={handleSignOut}
                       className="gap-2"
                     >
                       <LogOut className="h-4 w-4" />
-                      Sign Out
+                      <span className="hidden sm:inline">Sign Out</span>
                     </Button>
                   </>
                 ) : (
                   <>
                     <Link href="/sign-in">
-                      <Button variant="ghost">Sign In</Button>
+                      <Button variant="ghost" size="sm">
+                        Sign In
+                      </Button>
                     </Link>
                     <Link href="/sign-up">
-                      <Button>Get Started</Button>
+                      <Button size="sm">Get Started</Button>
                     </Link>
                   </>
                 )}
               </>
             )}
-          </div>
+          </nav>
         </div>
       </motion.header>
 
       <main className="flex-1">
-        <section className="container mx-auto px-4 py-24 md:py-32">
+        {/* Hero Section */}
+        <section className="container mx-auto px-4 py-20 md:py-28">
           <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="visible"
+            initial={{ opacity: 0, y: 30 }}
+            animate={{ opacity: 1, y: 0 }}
+            transition={{ duration: 0.6 }}
             className="mx-auto max-w-3xl text-center"
           >
             <motion.div
-              variants={itemVariants}
-              whileHover={{ scale: 1.02 }}
-              className="mb-6 inline-flex items-center gap-2 rounded-full border bg-muted px-4 py-1.5 text-sm transition-all duration-200 hover:bg-muted/80 hover:border-primary/50 cursor-default"
+              initial={{ opacity: 0, scale: 0.9 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.2 }}
+              className="mb-6 inline-flex items-center gap-2 rounded-full border-2 border-primary/20 bg-primary/5 px-4 py-2 text-sm font-medium text-primary"
             >
-              <motion.div
-                animate={{ rotate: [0, 15, -15, 0] }}
-                transition={{
-                  duration: 2,
-                  repeat: Infinity,
-                  ease: "easeInOut",
-                }}
-              >
-                <Sparkles className="h-4 w-4 text-primary" />
-              </motion.div>
+              <Sparkles className="h-4 w-4" />
               <span>The future of team collaboration</span>
             </motion.div>
+
             <motion.h1
-              variants={itemVariants}
-              className="mb-6 text-4xl font-bold tracking-tight sm:text-5xl md:text-6xl"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.3 }}
+              className="mb-6 text-4xl font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl"
             >
-              Work together,{" "}
-              <span className="bg-linear-to-r from-primary to-primary/60 bg-clip-text text-transparent">
-                achieve more
-              </span>
+              Work together, <span className="text-primary">achieve more</span>
             </motion.h1>
+
             <motion.p
-              variants={itemVariants}
-              className="mb-8 text-lg text-muted-foreground md:text-xl"
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4 }}
+              className="mb-10 text-lg text-muted-foreground md:text-xl max-w-2xl mx-auto"
             >
               CollabOS+ is the all-in-one platform for teams to collaborate,
-              manage projects, and get things done. Simple, powerful, and
-              designed for the way you work.
+              manage projects, and get things done efficiently.
             </motion.p>
+
             <motion.div
-              variants={itemVariants}
+              initial={{ opacity: 0, y: 20 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.5 }}
               className="flex flex-col items-center justify-center gap-4 sm:flex-row"
             >
               <Link href={user ? "/dashboard" : "/sign-up"}>
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.98 }}
+                <Button
+                  size="lg"
+                  className="h-12 px-8 text-base font-medium gap-2"
                 >
-                  <Button size="lg" className="gap-2">
-                    {user ? "Go to Dashboard" : "Get Started Free"}
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </motion.div>
+                  {user ? "Go to Dashboard" : "Get Started Free"}
+                  <ArrowRight className="h-4 w-4" />
+                </Button>
               </Link>
               {!user && (
                 <Link href="/sign-in">
-                  <motion.div
-                    whileHover={{ scale: 1.05 }}
-                    whileTap={{ scale: 0.98 }}
+                  <Button
+                    variant="outline"
+                    size="lg"
+                    className="h-12 px-8 text-base font-medium"
                   >
-                    <Button size="lg" variant="outline">
-                      Sign In
-                    </Button>
-                  </motion.div>
+                    Sign In
+                  </Button>
                 </Link>
               )}
+            </motion.div>
+
+            <motion.div
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              transition={{ delay: 0.7 }}
+              className="mt-10 flex flex-wrap items-center justify-center gap-6 text-sm text-muted-foreground"
+            >
+              {[
+                "No credit card required",
+                "14-day free trial",
+                "Cancel anytime",
+              ].map((item, i) => (
+                <div key={i} className="flex items-center gap-1.5">
+                  <CheckCircle className="h-4 w-4 text-primary" />
+                  <span>{item}</span>
+                </div>
+              ))}
             </motion.div>
           </motion.div>
         </section>
 
-        <section className="border-t bg-muted/30">
-          <div className="container mx-auto px-4 py-24">
-            <motion.h2
+        {/* Features Section */}
+        <section className="border-y bg-white/50">
+          <div className="container mx-auto px-4 py-20">
+            <motion.div
               initial={{ opacity: 0, y: 20 }}
               whileInView={{ opacity: 1, y: 0 }}
               viewport={{ once: true }}
               transition={{ duration: 0.5 }}
-              className="mb-12 text-center text-3xl font-bold"
+              className="text-center mb-14"
             >
-              Everything you need to succeed
-            </motion.h2>
-            <motion.div
-              variants={containerVariants}
-              initial="hidden"
-              whileInView="visible"
-              viewport={{ once: true }}
-              className="grid gap-8 md:grid-cols-3"
-            >
-              <motion.div
-                variants={cardVariants}
-                whileHover="hover"
-                className="rounded-xl border bg-background p-6 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20 cursor-default"
-              >
-                <motion.div
-                  whileHover={{ scale: 1.1, rotate: 5 }}
-                  className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 transition-all duration-300"
-                >
-                  <Zap className="h-6 w-6 text-primary" />
-                </motion.div>
-                <h3 className="mb-2 text-xl font-semibold">Lightning Fast</h3>
-                <p className="text-muted-foreground">
-                  Built for speed. Real-time updates and instant sync across all
-                  your devices.
-                </p>
-              </motion.div>
-              <motion.div
-                variants={cardVariants}
-                whileHover="hover"
-                className="rounded-xl border bg-background p-6 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20 cursor-default"
-              >
-                <motion.div
-                  whileHover={{ scale: 1.1, rotate: 5 }}
-                  className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 transition-all duration-300"
-                >
-                  <Users className="h-6 w-6 text-primary" />
-                </motion.div>
-                <h3 className="mb-2 text-xl font-semibold">Team First</h3>
-                <p className="text-muted-foreground">
-                  Designed for collaboration. Work together seamlessly with your
-                  entire team.
-                </p>
-              </motion.div>
-              <motion.div
-                variants={cardVariants}
-                whileHover="hover"
-                className="rounded-xl border bg-background p-6 transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20 cursor-default"
-              >
-                <motion.div
-                  whileHover={{ scale: 1.1, rotate: 5 }}
-                  className="mb-4 flex h-12 w-12 items-center justify-center rounded-lg bg-primary/10 transition-all duration-300"
-                >
-                  <Shield className="h-6 w-6 text-primary" />
-                </motion.div>
-                <h3 className="mb-2 text-xl font-semibold">
-                  Secure by Default
-                </h3>
-                <p className="text-muted-foreground">
-                  Enterprise-grade security. Your data is encrypted and
-                  protected at all times.
-                </p>
-              </motion.div>
+              <h2 className="text-3xl font-bold text-foreground mb-4">
+                Everything you need to succeed
+              </h2>
+              <p className="text-muted-foreground max-w-xl mx-auto">
+                Powerful features designed to help your team work smarter, not
+                harder.
+              </p>
             </motion.div>
+
+            <div className="grid gap-6 md:grid-cols-3 max-w-5xl mx-auto">
+              {features.map((feature, index) => (
+                <motion.div
+                  key={feature.title}
+                  initial={{ opacity: 0, y: 30 }}
+                  whileInView={{ opacity: 1, y: 0 }}
+                  viewport={{ once: true }}
+                  transition={{ delay: index * 0.1, duration: 0.5 }}
+                  whileHover={{ y: -6, transition: { duration: 0.2 } }}
+                  className="group rounded-2xl border-2 bg-white p-6 transition-all duration-300 hover:shadow-xl hover:shadow-primary/5 hover:border-primary/30 cursor-pointer"
+                >
+                  <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 transition-all duration-300 group-hover:bg-primary/20 group-hover:scale-110">
+                    <feature.icon className="h-6 w-6 text-primary" />
+                  </div>
+                  <h3 className="mb-2 text-lg font-semibold text-foreground">
+                    {feature.title}
+                  </h3>
+                  <p className="text-muted-foreground text-sm leading-relaxed">
+                    {feature.description}
+                  </p>
+                </motion.div>
+              ))}
+            </div>
           </div>
         </section>
 
-        <section className="border-t">
-          <div className="container mx-auto px-4 py-24 text-center">
-            <motion.div
-              initial={{ opacity: 0, y: 20 }}
-              whileInView={{ opacity: 1, y: 0 }}
-              viewport={{ once: true }}
-              transition={{ duration: 0.5 }}
-            >
-              <h2 className="mb-4 text-3xl font-bold">Ready to get started?</h2>
-              <p className="mb-8 text-lg text-muted-foreground">
-                Join thousands of teams already using CollabOS+
-              </p>
-              <Link href={user ? "/dashboard" : "/sign-up"}>
-                <motion.div
-                  whileHover={{ scale: 1.05 }}
-                  whileTap={{ scale: 0.98 }}
-                  className="inline-block"
-                >
-                  <Button size="lg" className="gap-2">
-                    {user ? "Go to Dashboard" : "Start for Free"}
-                    <ArrowRight className="h-4 w-4" />
-                  </Button>
-                </motion.div>
-              </Link>
-            </motion.div>
-          </div>
+        {/* CTA Section */}
+        <section className="container mx-auto px-4 py-20 text-center">
+          <motion.div
+            initial={{ opacity: 0, y: 20 }}
+            whileInView={{ opacity: 1, y: 0 }}
+            viewport={{ once: true }}
+            transition={{ duration: 0.5 }}
+            className="max-w-2xl mx-auto"
+          >
+            <h2 className="text-3xl font-bold text-foreground mb-4">
+              Ready to get started?
+            </h2>
+            <p className="text-muted-foreground mb-8 text-lg">
+              Join thousands of teams already using CollabOS+
+            </p>
+            <Link href={user ? "/dashboard" : "/sign-up"}>
+              <Button
+                size="lg"
+                className="h-12 px-8 text-base font-medium gap-2"
+              >
+                {user ? "Go to Dashboard" : "Start for Free"}
+                <ArrowRight className="h-4 w-4" />
+              </Button>
+            </Link>
+          </motion.div>
         </section>
       </main>
 
-      <motion.footer
-        initial={{ opacity: 0 }}
-        whileInView={{ opacity: 1 }}
-        viewport={{ once: true }}
-        className="border-t py-8"
-      >
+      {/* Footer */}
+      <footer className="border-t bg-white/50 py-8">
         <div className="container mx-auto px-4 text-center text-sm text-muted-foreground">
           <p>© 2026 CollabOS+. All rights reserved.</p>
         </div>
-      </motion.footer>
+      </footer>
     </div>
   );
 }
