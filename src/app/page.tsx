@@ -2,18 +2,15 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import {
   ArrowRight,
   Zap,
   Shield,
   Users,
   Sparkles,
-  LogOut,
   CheckCircle,
 } from "lucide-react";
 import { motion } from "motion/react";
-import { toast } from "sonner";
 import { Button } from "@/components/ui/button";
 
 interface User {
@@ -22,7 +19,6 @@ interface User {
 }
 
 export default function Home() {
-  const router = useRouter();
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
 
@@ -42,21 +38,6 @@ export default function Home() {
     };
     checkAuth();
   }, []);
-
-  const handleSignOut = async () => {
-    try {
-      await fetch("/api/auth/logout", { method: "POST" });
-      setUser(null);
-      toast.success("Signed out successfully", {
-        description: "You have been logged out of your account.",
-      });
-      router.refresh();
-    } catch {
-      toast.error("Failed to sign out", {
-        description: "Please try again.",
-      });
-    }
-  };
 
   const features = [
     {
@@ -111,19 +92,8 @@ export default function Home() {
                       </span>
                     </span>
                     <Link href="/dashboard">
-                      <Button variant="ghost" size="sm">
-                        Dashboard
-                      </Button>
+                      <Button size="sm">Go to Dashboard</Button>
                     </Link>
-                    <Button
-                      variant="outline"
-                      size="sm"
-                      onClick={handleSignOut}
-                      className="gap-2"
-                    >
-                      <LogOut className="h-4 w-4" />
-                      <span className="hidden sm:inline">Sign Out</span>
-                    </Button>
                   </>
                 ) : (
                   <>

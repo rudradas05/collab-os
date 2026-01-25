@@ -2,7 +2,14 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, CreditCard, Bell, User, Menu } from "lucide-react";
+import {
+  LayoutDashboard,
+  CreditCard,
+  Bell,
+  User,
+  Menu,
+  Building2,
+} from "lucide-react";
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -19,6 +26,11 @@ const sidebarItems = [
     title: "Dashboard",
     href: "/dashboard",
     icon: LayoutDashboard,
+  },
+  {
+    title: "Workspaces",
+    href: "/dashboard/workspaces",
+    icon: Building2,
   },
   {
     title: "Billing",

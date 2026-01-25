@@ -22,6 +22,7 @@ export default function SignInPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    const loadingToast = toast.loading("Signing in...");
 
     try {
       const response = await fetch("/api/auth/login", {
@@ -33,18 +34,21 @@ export default function SignInPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        toast.dismiss(loadingToast);
         toast.error("Sign in failed", {
           description: data.error || "Invalid email or password.",
         });
         return;
       }
 
+      toast.dismiss(loadingToast);
       toast.success("Welcome back!", {
         description: "You have successfully signed in.",
       });
       router.push("/dashboard");
       router.refresh();
     } catch {
+      toast.dismiss(loadingToast);
       toast.error("Something went wrong", {
         description: "Please try again later.",
       });
@@ -55,6 +59,7 @@ export default function SignInPage() {
 
   const handleGoogleSuccess = async (credential: string) => {
     setIsLoading(true);
+    const loadingToast = toast.loading("Signing in with Google...");
 
     try {
       const response = await fetch("/api/auth/google", {
@@ -66,18 +71,21 @@ export default function SignInPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        toast.dismiss(loadingToast);
         toast.error("Google sign-in failed", {
           description: data.error || "Please try again.",
         });
         return;
       }
 
+      toast.dismiss(loadingToast);
       toast.success("Welcome back!", {
         description: "You have successfully signed in with Google.",
       });
       router.push("/dashboard");
       router.refresh();
     } catch {
+      toast.dismiss(loadingToast);
       toast.error("Google sign-in failed", {
         description: "Please try again later.",
       });

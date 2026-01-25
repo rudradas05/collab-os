@@ -77,7 +77,7 @@ export default async function ProfilePage() {
               <p className="text-sm font-medium text-muted-foreground">
                 User ID
               </p>
-              <p className="text-base font-mono text-sm">{user?.id}</p>
+              <p className=" font-mono text-sm">{user?.id}</p>
             </div>
           </div>
         </CardContent>

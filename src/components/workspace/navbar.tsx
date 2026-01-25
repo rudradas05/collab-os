@@ -1,10 +1,12 @@
 "use client";
 
-import { useRouter, usePathname } from "next/navigation";
-import { LogOut, User, ChevronRight } from "lucide-react";
+import { useRouter } from "next/navigation";
+import Link from "next/link";
+import { LogOut, User, Crown, Users, ArrowLeft } from "lucide-react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
+import { Button } from "@/components/ui/button";
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -13,40 +15,29 @@ import {
   DropdownMenuSeparator,
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
-import {
-  Breadcrumb,
-  BreadcrumbItem,
-  BreadcrumbLink,
-  BreadcrumbList,
-  BreadcrumbPage,
-  BreadcrumbSeparator,
-} from "@/components/ui/breadcrumb";
-import { Button } from "@/components/ui/button";
-import { MobileSidebar } from "@/components/dashboard/sidebar";
-import { Role } from "@/generated/prisma";
+import { MobileWorkspaceSidebar } from "@/components/workspace/sidebar";
+import { Role, WorkspaceRole } from "@/generated/prisma";
 
-interface NavbarProps {
+interface WorkspaceNavbarProps {
   user: {
     email: string;
     name: string;
     role: Role;
     avatar: string | null;
   };
+  workspace: {
+    id: string;
+    name: string;
+  };
+  workspaceRole: WorkspaceRole;
 }
 
-const routeTitles: Record<string, string> = {
-  "/dashboard": "Dashboard",
-  "/dashboard/profile": "Profile",
-  "/dashboard/notifications": "Notifications",
-  "/dashboard/billing": "Billing",
-};
-
-export function Navbar({ user }: NavbarProps) {
+export function WorkspaceNavbar({
+  user,
+  workspace,
+  workspaceRole,
+}: WorkspaceNavbarProps) {
   const router = useRouter();
-  const pathname = usePathname();
-
-  const currentTitle = routeTitles[pathname] || "Dashboard";
-  const isSubPage = pathname !== "/dashboard";
 
   const handleLogout = async () => {
     const loadingToast = toast.loading("Signing out...");
@@ -83,28 +74,33 @@ export function Navbar({ user }: NavbarProps) {
       className="flex h-14 items-center justify-between border-b bg-background px-4"
     >
       <div className="flex items-center gap-4">
-        <MobileSidebar />
-        <Breadcrumb>
-          <BreadcrumbList>
-            <BreadcrumbItem>
-              {isSubPage ? (
-                <BreadcrumbLink href="/dashboard">Dashboard</BreadcrumbLink>
-              ) : (
-                <BreadcrumbPage>Dashboard</BreadcrumbPage>
-              )}
-            </BreadcrumbItem>
-            {isSubPage && (
-              <>
-                <BreadcrumbSeparator>
-                  <ChevronRight className="h-4 w-4" />
-                </BreadcrumbSeparator>
-                <BreadcrumbItem>
-                  <BreadcrumbPage>{currentTitle}</BreadcrumbPage>
-                </BreadcrumbItem>
-              </>
+        <MobileWorkspaceSidebar
+          workspaceId={workspace.id}
+          workspaceName={workspace.name}
+        />
+        <Link href="/dashboard/workspaces">
+          <Button variant="ghost" size="sm" className="gap-1.5 hidden sm:flex">
+            <ArrowLeft className="h-4 w-4" />
+            Back
+          </Button>
+        </Link>
+        <div className="flex items-center gap-2">
+          <h1 className="font-semibold text-foreground">{workspace.name}</h1>
+          <div
+            className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
+              workspaceRole === "OWNER"
+                ? "text-amber-600 bg-amber-50"
+                : "text-blue-600 bg-blue-50"
+            }`}
+          >
+            {workspaceRole === "OWNER" ? (
+              <Crown className="h-3 w-3" />
+            ) : (
+              <Users className="h-3 w-3" />
             )}
-          </BreadcrumbList>
-        </Breadcrumb>
+            {workspaceRole === "OWNER" ? "Owner" : "Member"}
+          </div>
+        </div>
       </div>
 
       <div className="flex items-center gap-3">
@@ -127,9 +123,6 @@ export function Navbar({ user }: NavbarProps) {
                 <p className="text-sm font-medium leading-none">{user.name}</p>
                 <p className="text-xs leading-none text-muted-foreground">
                   {user.email}
-                </p>
-                <p className="text-xs leading-none text-muted-foreground capitalize">
-                  Role: {user.role.toLowerCase()}
                 </p>
               </div>
             </DropdownMenuLabel>

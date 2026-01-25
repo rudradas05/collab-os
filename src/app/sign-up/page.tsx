@@ -30,6 +30,7 @@ export default function SignUpPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoading(true);
+    const loadingToast = toast.loading("Creating your account...");
 
     try {
       const response = await fetch("/api/auth/signup", {
@@ -41,18 +42,21 @@ export default function SignUpPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        toast.dismiss(loadingToast);
         toast.error("Sign up failed", {
           description: data.error || "Please check your information.",
         });
         return;
       }
 
+      toast.dismiss(loadingToast);
       toast.success("Account created!", {
         description: "Welcome to CollabOS+. Let's get started!",
       });
       router.push("/dashboard");
       router.refresh();
     } catch {
+      toast.dismiss(loadingToast);
       toast.error("Something went wrong", {
         description: "Please try again later.",
       });
@@ -63,6 +67,7 @@ export default function SignUpPage() {
 
   const handleGoogleSuccess = async (credential: string) => {
     setIsLoading(true);
+    const loadingToast = toast.loading("Setting up your account...");
 
     try {
       const response = await fetch("/api/auth/google", {
@@ -74,18 +79,21 @@ export default function SignUpPage() {
       const data = await response.json();
 
       if (!response.ok) {
+        toast.dismiss(loadingToast);
         toast.error("Google sign-up failed", {
           description: data.error || "Please try again.",
         });
         return;
       }
 
+      toast.dismiss(loadingToast);
       toast.success("Welcome to CollabOS+!", {
         description: "Your account has been created successfully.",
       });
       router.push("/dashboard");
       router.refresh();
     } catch {
+      toast.dismiss(loadingToast);
       toast.error("Google sign-up failed", {
         description: "Please try again later.",
       });

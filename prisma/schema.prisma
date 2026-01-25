@@ -13,13 +13,41 @@ enum Role {
   ADMIN
 }
 
+enum WorkspaceRole {
+  OWNER
+  MEMBER
+}
+
 model User {
-  id           String   @id @default(uuid())
-  email        String   @unique
-  name         String
-  passwordHash String?
-  googleId     String?  @unique
-  avatar       String?
-  role         Role     @default(USER)
-  createdAt    DateTime @default(now())
+  id                   String            @id @default(uuid())
+  email                String            @unique
+  name                 String
+  passwordHash         String?
+  googleId             String?           @unique
+  avatar               String?
+  role                 Role              @default(USER)
+  createdAt            DateTime          @default(now())
+  ownedWorkspaces      Workspace[]       @relation("WorkspaceOwner")
+  workspaceMemberships WorkspaceMember[]
+}
+
+model Workspace {
+  id        String            @id @default(uuid())
+  name      String
+  ownerId   String
+  createdAt DateTime          @default(now())
+  owner     User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members   WorkspaceMember[]
+}
+
+model WorkspaceMember {
+  id          String        @id @default(uuid())
+  userId      String
+  workspaceId String
+  role        WorkspaceRole
+  createdAt   DateTime      @default(now())
+  user        User          @relation(fields: [userId], references: [id], onDelete: Cascade)
+  workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, workspaceId])
 }
