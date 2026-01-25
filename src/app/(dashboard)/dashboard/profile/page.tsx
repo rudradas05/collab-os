@@ -28,7 +28,7 @@ export default async function ProfilePage() {
         <p className="text-muted-foreground">View your account information</p>
       </div>
 
-      <Card>
+      <Card className="transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20">
         <CardHeader>
           <CardTitle>Account Information</CardTitle>
           <CardDescription>
@@ -37,7 +37,7 @@ export default async function ProfilePage() {
         </CardHeader>
         <CardContent className="space-y-6">
           <div className="flex items-center gap-4">
-            <Avatar className="h-20 w-20">
+            <Avatar className="h-20 w-20 transition-all duration-300 hover:ring-4 hover:ring-primary/20 hover:scale-105">
               <AvatarImage src={user?.avatar || undefined} alt={user?.name} />
               <AvatarFallback className="text-xl">
                 {getInitials(user?.name || "")}

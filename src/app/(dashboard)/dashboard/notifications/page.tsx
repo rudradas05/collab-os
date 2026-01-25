@@ -17,15 +17,15 @@ export default function NotificationsPage() {
         </p>
       </div>
 
-      <Card>
+      <Card className="transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20">
         <CardHeader>
           <CardTitle>Notification Center</CardTitle>
           <CardDescription>View and manage your notifications</CardDescription>
         </CardHeader>
         <CardContent>
           <div className="flex flex-col items-center justify-center py-12">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted">
-              <Bell className="h-8 w-8 text-muted-foreground" />
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-muted transition-all duration-300 hover:bg-primary/10 hover:scale-110">
+              <Bell className="h-8 w-8 text-muted-foreground transition-colors duration-300 hover:text-primary" />
             </div>
             <h3 className="mt-4 text-lg font-semibold">No notifications</h3>
             <p className="mt-1 text-center text-sm text-muted-foreground">

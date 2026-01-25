@@ -2,6 +2,8 @@
 
 import { useRouter, usePathname } from "next/navigation";
 import { LogOut, User, ChevronRight } from "lucide-react";
+import { motion } from "motion/react";
+import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
   DropdownMenu,
@@ -46,9 +48,18 @@ export function Navbar({ user }: NavbarProps) {
   const isSubPage = pathname !== "/dashboard";
 
   const handleLogout = async () => {
-    await fetch("/api/auth/logout", { method: "POST" });
-    router.push("/sign-in");
-    router.refresh();
+    try {
+      await fetch("/api/auth/logout", { method: "POST" });
+      toast.success("Signed out successfully", {
+        description: "You have been logged out of your account.",
+      });
+      router.push("/");
+      router.refresh();
+    } catch {
+      toast.error("Failed to sign out", {
+        description: "Please try again.",
+      });
+    }
   };
 
   const getInitials = (name: string) => {
@@ -61,7 +72,12 @@ export function Navbar({ user }: NavbarProps) {
   };
 
   return (
-    <header className="flex h-14 items-center justify-between border-b bg-background px-4">
+    <motion.header
+      initial={{ opacity: 0, y: -10 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.3 }}
+      className="flex h-14 items-center justify-between border-b bg-background px-4"
+    >
       <div className="flex items-center gap-4">
         <MobileSidebar />
         <Breadcrumb>
@@ -89,12 +105,16 @@ export function Navbar({ user }: NavbarProps) {
 
       <DropdownMenu>
         <DropdownMenuTrigger asChild>
-          <button className="flex items-center gap-2 rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2">
-            <Avatar className="h-8 w-8 cursor-pointer">
+          <motion.button
+            whileHover={{ scale: 1.05 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex items-center gap-2 rounded-full outline-none ring-offset-background focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            <Avatar className="h-8 w-8 cursor-pointer transition-all duration-200 hover:ring-2 hover:ring-primary/50 hover:ring-offset-2">
               <AvatarImage src={user.avatar || undefined} alt={user.name} />
               <AvatarFallback>{getInitials(user.name)}</AvatarFallback>
             </Avatar>
-          </button>
+          </motion.button>
         </DropdownMenuTrigger>
         <DropdownMenuContent align="end" className="w-56">
           <DropdownMenuLabel className="font-normal">
@@ -120,6 +140,6 @@ export function Navbar({ user }: NavbarProps) {
           </DropdownMenuItem>
         </DropdownMenuContent>
       </DropdownMenu>
-    </header>
+    </motion.header>
   );
 }

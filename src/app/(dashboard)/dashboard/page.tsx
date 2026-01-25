@@ -22,7 +22,7 @@ export default async function DashboardPage() {
       </div>
 
       <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-        <Card>
+        <Card className="transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20 hover:-translate-y-1">
           <CardHeader>
             <CardTitle>Email</CardTitle>
             <CardDescription>Your registered email address</CardDescription>
@@ -32,7 +32,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20 hover:-translate-y-1">
           <CardHeader>
             <CardTitle>Role</CardTitle>
             <CardDescription>Your current account role</CardDescription>
@@ -44,7 +44,7 @@ export default async function DashboardPage() {
           </CardContent>
         </Card>
 
-        <Card>
+        <Card className="transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20 hover:-translate-y-1">
           <CardHeader>
             <CardTitle>Account Status</CardTitle>
             <CardDescription>Your account is active</CardDescription>

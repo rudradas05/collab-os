@@ -2,7 +2,8 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { LayoutDashboard, CreditCard, Bell, User, Menu, X } from "lucide-react";
+import { LayoutDashboard, CreditCard, Bell, User, Menu } from "lucide-react";
+import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -46,30 +47,42 @@ function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
           href="/dashboard"
           className="flex items-center gap-2 font-semibold"
         >
-          <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+          <motion.div
+            whileHover={{ scale: 1.1, rotate: 5 }}
+            whileTap={{ scale: 0.95 }}
+            className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary text-primary-foreground transition-all duration-200 hover:shadow-lg hover:shadow-primary/25"
+          >
             C+
-          </div>
+          </motion.div>
           <span>CollabOS+</span>
         </Link>
       </div>
       <nav className="flex-1 space-y-1 p-4">
-        {sidebarItems.map((item) => {
+        {sidebarItems.map((item, index) => {
           const isActive = pathname === item.href;
           return (
-            <Link
+            <motion.div
               key={item.href}
-              href={item.href}
-              onClick={onItemClick}
-              className={cn(
-                "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-colors",
-                isActive
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:bg-muted hover:text-foreground",
-              )}
+              initial={{ opacity: 0, x: -20 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: index * 0.1 }}
             >
-              <item.icon className="h-4 w-4" />
-              {item.title}
-            </Link>
+              <Link href={item.href} onClick={onItemClick}>
+                <motion.div
+                  whileHover={{ x: isActive ? 0 : 4 }}
+                  whileTap={{ scale: 0.98 }}
+                  className={cn(
+                    "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                    isActive
+                      ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                  )}
+                >
+                  <item.icon className="h-4 w-4" />
+                  {item.title}
+                </motion.div>
+              </Link>
+            </motion.div>
           );
         })}
       </nav>
@@ -79,9 +92,14 @@ function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
 
 export function Sidebar() {
   return (
-    <aside className="hidden h-screen w-64 border-r bg-background md:block">
+    <motion.aside
+      initial={{ opacity: 0, x: -20 }}
+      animate={{ opacity: 1, x: 0 }}
+      transition={{ duration: 0.3 }}
+      className="hidden h-screen w-64 border-r bg-background md:block"
+    >
       <SidebarContent />
-    </aside>
+    </motion.aside>
   );
 }
 
