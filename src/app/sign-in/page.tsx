@@ -43,7 +43,7 @@ export default function SignInPage() {
         return;
       }
 
-      router.push("/");
+      router.push("/dashboard");
       router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");
@@ -70,7 +70,7 @@ export default function SignInPage() {
         return;
       }
 
-      router.push("/");
+      router.push("/dashboard");
       router.refresh();
     } catch {
       setError("Google sign-in failed. Please try again.");

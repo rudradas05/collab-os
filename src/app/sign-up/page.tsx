@@ -44,7 +44,7 @@ export default function SignUpPage() {
         return;
       }
 
-      router.push("/");
+      router.push("/dashboard");
       router.refresh();
     } catch {
       setError("Something went wrong. Please try again.");
@@ -71,7 +71,7 @@ export default function SignUpPage() {
         return;
       }
 
-      router.push("/");
+      router.push("/dashboard");
       router.refresh();
     } catch {
       setError("Google sign-in failed. Please try again.");
