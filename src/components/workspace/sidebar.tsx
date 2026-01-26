@@ -13,6 +13,7 @@ import {
   FileText,
   ChevronDown,
   ChevronRight,
+  Sparkles,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
@@ -50,10 +51,10 @@ const getWorkspaceItems = (workspaceId: string) => [
     exact: false,
   },
   {
-    title: "Chat",
+    title: "AI Assistant",
     href: `/workspace/${workspaceId}/chat`,
-    icon: MessageSquare,
-    disabled: true,
+    icon: Sparkles,
+    disabled: false,
     exact: true,
   },
   {
