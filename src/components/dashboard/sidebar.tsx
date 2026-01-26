@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
 import {
   LayoutDashboard,
   CreditCard,
@@ -9,8 +10,10 @@ import {
   User,
   Menu,
   Building2,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -19,9 +22,13 @@ import {
   SheetTrigger,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { useState } from "react";
 
-const sidebarItems = [
+interface Workspace {
+  id: string;
+  name: string;
+}
+
+const mainNavItems = [
   {
     title: "Dashboard",
     href: "/dashboard",
@@ -32,15 +39,18 @@ const sidebarItems = [
     href: "/dashboard/workspaces",
     icon: Building2,
   },
-  {
-    title: "Billing",
-    href: "/dashboard/billing",
-    icon: CreditCard,
-  },
+];
+
+const bottomNavItems = [
   {
     title: "Notifications",
     href: "/dashboard/notifications",
     icon: Bell,
+  },
+  {
+    title: "Billing",
+    href: "/dashboard/billing",
+    icon: CreditCard,
   },
   {
     title: "Profile",
@@ -51,6 +61,24 @@ const sidebarItems = [
 
 function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   const pathname = usePathname();
+  const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [isWorkspacesExpanded, setIsWorkspacesExpanded] = useState(true);
+
+  const fetchWorkspaces = useCallback(async () => {
+    try {
+      const response = await fetch("/api/workspaces");
+      const data = await response.json();
+      if (response.ok) {
+        setWorkspaces(data.workspaces || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch workspaces:", error);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchWorkspaces();
+  }, [fetchWorkspaces]);
 
   return (
     <div className="flex h-full flex-col">
@@ -69,8 +97,10 @@ function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
           <span>CollabOS+</span>
         </Link>
       </div>
-      <nav className="flex-1 space-y-1 p-4">
-        {sidebarItems.map((item, index) => {
+
+      {/* Main Navigation */}
+      <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
+        {mainNavItems.map((item, index) => {
           const isActive = pathname === item.href;
           return (
             <motion.div
@@ -97,7 +127,93 @@ function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
             </motion.div>
           );
         })}
+
+        {/* Quick Access Workspaces */}
+        {workspaces.length > 0 && (
+          <div className="pt-4 mt-4 border-t">
+            <button
+              onClick={() => setIsWorkspacesExpanded(!isWorkspacesExpanded)}
+              className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+            >
+              <span>Quick Access</span>
+              {isWorkspacesExpanded ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
+            </button>
+            <AnimatePresence>
+              {isWorkspacesExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden space-y-1 mt-1"
+                >
+                  {workspaces.slice(0, 5).map((workspace) => {
+                    const workspacePath = `/workspace/${workspace.id}`;
+                    const isWorkspaceActive =
+                      pathname.startsWith(workspacePath);
+                    return (
+                      <Link
+                        key={workspace.id}
+                        href={workspacePath}
+                        onClick={onItemClick}
+                      >
+                        <motion.div
+                          whileHover={{ x: isWorkspaceActive ? 0 : 4 }}
+                          whileTap={{ scale: 0.98 }}
+                          className={cn(
+                            "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-all duration-200",
+                            isWorkspaceActive
+                              ? "bg-primary/10 text-primary font-medium"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                          )}
+                        >
+                          <Building2 className="h-3.5 w-3.5" />
+                          <span className="truncate">{workspace.name}</span>
+                        </motion.div>
+                      </Link>
+                    );
+                  })}
+                  {workspaces.length > 5 && (
+                    <Link href="/dashboard/workspaces" onClick={onItemClick}>
+                      <div className="px-3 py-1.5 text-xs text-primary hover:underline">
+                        View all {workspaces.length} workspaces →
+                      </div>
+                    </Link>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
       </nav>
+
+      {/* Bottom Navigation - VS Code Style */}
+      <div className="border-t p-2 pb-4 space-y-1">
+        {bottomNavItems.map((item) => {
+          const isActive = pathname === item.href;
+          return (
+            <Link key={item.href} href={item.href} onClick={onItemClick}>
+              <motion.div
+                whileHover={{ x: 2 }}
+                whileTap={{ scale: 0.98 }}
+                className={cn(
+                  "flex items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium transition-all duration-200",
+                  isActive
+                    ? "bg-primary text-primary-foreground shadow-md shadow-primary/20"
+                    : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                )}
+              >
+                <item.icon className="h-4 w-4" />
+                {item.title}
+              </motion.div>
+            </Link>
+          );
+        })}
+      </div>
     </div>
   );
 }

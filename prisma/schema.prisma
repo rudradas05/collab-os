@@ -18,6 +18,12 @@ enum WorkspaceRole {
   MEMBER
 }
 
+enum TaskStatus {
+  TODO
+  IN_PROGRESS
+  DONE
+}
+
 model User {
   id                   String               @id @default(uuid())
   email                String               @unique
@@ -26,10 +32,14 @@ model User {
   googleId             String?              @unique
   avatar               String?
   role                 Role                 @default(USER)
+  coins                Int                  @default(0)
+  tier                 String               @default("FREE")
   createdAt            DateTime             @default(now())
   ownedWorkspaces      Workspace[]          @relation("WorkspaceOwner")
   workspaceMemberships WorkspaceMember[]
   passwordResetTokens  PasswordResetToken[]
+  assignedTasks        Task[]               @relation("TaskAssignee")
+  coinTransactions     CoinTransaction[]
 }
 
 model PasswordResetToken {
@@ -53,6 +63,7 @@ model Workspace {
   createdAt DateTime          @default(now())
   owner     User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
   members   WorkspaceMember[]
+  projects  Project[]
 }
 
 model WorkspaceMember {
@@ -65,4 +76,56 @@ model WorkspaceMember {
   workspace   Workspace     @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
 
   @@unique([userId, workspaceId])
+}
+
+model Project {
+  id          String    @id @default(uuid())
+  name        String
+  description String?
+  workspaceId String
+  createdAt   DateTime  @default(now())
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  tasks       Task[]
+
+  @@index([workspaceId])
+}
+
+model Task {
+  id          String     @id @default(uuid())
+  title       String
+  status      TaskStatus @default(TODO)
+  projectId   String
+  assignedTo  String?
+  completedAt DateTime?
+  createdAt   DateTime   @default(now())
+  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee    User?      @relation("TaskAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+
+  @@index([projectId])
+  @@index([assignedTo])
+}
+
+model CoinTransaction {
+  id          String   @id @default(uuid())
+  userId      String
+  amount      Int
+  reason      String
+  referenceId String
+  createdAt   DateTime @default(now())
+  user        User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([referenceId])
+  @@index([userId])
+}
+
+model AIMessage {
+  id          String   @id @default(uuid())
+  userId      String
+  workspaceId String
+  role        String
+  content     String
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([workspaceId])
 }

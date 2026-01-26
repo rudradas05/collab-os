@@ -2,16 +2,19 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState, useEffect, useCallback } from "react";
 import {
   LayoutDashboard,
   FolderKanban,
-  CheckSquare,
   MessageSquare,
   Settings,
   Menu,
   ArrowLeft,
+  FileText,
+  ChevronDown,
+  ChevronRight,
 } from "lucide-react";
-import { motion } from "motion/react";
+import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import {
@@ -20,7 +23,11 @@ import {
   SheetTrigger,
   SheetTitle,
 } from "@/components/ui/sheet";
-import { useState } from "react";
+
+interface Project {
+  id: string;
+  name: string;
+}
 
 interface WorkspaceSidebarProps {
   workspaceId: string;
@@ -33,30 +40,28 @@ const getWorkspaceItems = (workspaceId: string) => [
     href: `/workspace/${workspaceId}`,
     icon: LayoutDashboard,
     disabled: false,
+    exact: true,
   },
   {
     title: "Projects",
     href: `/workspace/${workspaceId}/projects`,
     icon: FolderKanban,
-    disabled: true,
-  },
-  {
-    title: "Tasks",
-    href: `/workspace/${workspaceId}/tasks`,
-    icon: CheckSquare,
-    disabled: true,
+    disabled: false,
+    exact: false,
   },
   {
     title: "Chat",
     href: `/workspace/${workspaceId}/chat`,
     icon: MessageSquare,
     disabled: true,
+    exact: true,
   },
   {
     title: "Settings",
     href: `/workspace/${workspaceId}/settings`,
     icon: Settings,
     disabled: true,
+    exact: true,
   },
 ];
 
@@ -67,12 +72,30 @@ function WorkspaceSidebarContent({
 }: WorkspaceSidebarProps & { onItemClick?: () => void }) {
   const pathname = usePathname();
   const items = getWorkspaceItems(workspaceId);
+  const [projects, setProjects] = useState<Project[]>([]);
+  const [isProjectsExpanded, setIsProjectsExpanded] = useState(true);
+
+  const fetchProjects = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/projects?workspaceId=${workspaceId}`);
+      const data = await response.json();
+      if (response.ok) {
+        setProjects(data.projects || []);
+      }
+    } catch (error) {
+      console.error("Failed to fetch projects:", error);
+    }
+  }, [workspaceId]);
+
+  useEffect(() => {
+    fetchProjects();
+  }, [fetchProjects]);
 
   return (
     <div className="flex h-full flex-col">
       <div className="flex h-14 items-center border-b px-4">
         <Link
-          href={`/workspace/${workspaceId}`}
+          href="/"
           className="flex items-center gap-2 font-semibold flex-1 overflow-hidden"
         >
           <motion.div
@@ -82,12 +105,23 @@ function WorkspaceSidebarContent({
           >
             C+
           </motion.div>
-          <span className="truncate">{workspaceName}</span>
+          <span className="truncate">CollabOS+</span>
         </Link>
       </div>
-      <nav className="flex-1 space-y-1 p-4">
+
+      {/* Workspace Name */}
+      <div className="px-4 py-3 border-b">
+        <p className="text-xs text-muted-foreground uppercase tracking-wider mb-1">
+          Workspace
+        </p>
+        <p className="font-medium text-foreground truncate">{workspaceName}</p>
+      </div>
+
+      <nav className="flex-1 space-y-1 p-4 overflow-y-auto">
         {items.map((item, index) => {
-          const isActive = pathname === item.href;
+          const isActive = item.exact
+            ? pathname === item.href
+            : pathname.startsWith(item.href);
           return (
             <motion.div
               key={item.href}
@@ -124,10 +158,79 @@ function WorkspaceSidebarContent({
             </motion.div>
           );
         })}
+
+        {/* Projects Quick Access Section */}
+        {projects.length > 0 && (
+          <div className="pt-4 mt-4 border-t">
+            <button
+              onClick={() => setIsProjectsExpanded(!isProjectsExpanded)}
+              className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+            >
+              <span>Quick Access</span>
+              {isProjectsExpanded ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
+            </button>
+            <AnimatePresence>
+              {isProjectsExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden space-y-1 mt-1"
+                >
+                  {projects.slice(0, 5).map((project) => {
+                    const projectPath = `/workspace/${workspaceId}/projects/${project.id}`;
+                    const isProjectActive = pathname === projectPath;
+                    return (
+                      <Link
+                        key={project.id}
+                        href={projectPath}
+                        onClick={onItemClick}
+                      >
+                        <motion.div
+                          whileHover={{ x: isProjectActive ? 0 : 4 }}
+                          whileTap={{ scale: 0.98 }}
+                          className={cn(
+                            "flex items-center gap-2 rounded-lg px-3 py-1.5 text-sm transition-all duration-200",
+                            isProjectActive
+                              ? "bg-primary/10 text-primary font-medium"
+                              : "text-muted-foreground hover:bg-muted hover:text-foreground",
+                          )}
+                        >
+                          <FileText className="h-3.5 w-3.5" />
+                          <span className="truncate">{project.name}</span>
+                        </motion.div>
+                      </Link>
+                    );
+                  })}
+                  {projects.length > 5 && (
+                    <Link
+                      href={`/workspace/${workspaceId}/projects`}
+                      onClick={onItemClick}
+                    >
+                      <div className="px-3 py-1.5 text-xs text-primary hover:underline">
+                        View all {projects.length} projects →
+                      </div>
+                    </Link>
+                  )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
       </nav>
-      <div className="border-t p-4">
-        <Link href="/dashboard/workspaces">
-          <Button variant="ghost" className="w-full justify-start gap-2">
+
+      {/* All Workspaces Link */}
+      <div className="border-t p-4 pb-6">
+        <Link href="/dashboard/workspaces" onClick={onItemClick}>
+          <Button
+            variant="ghost"
+            className="w-full justify-start gap-2 text-muted-foreground hover:text-foreground"
+          >
             <ArrowLeft className="h-4 w-4" />
             All Workspaces
           </Button>

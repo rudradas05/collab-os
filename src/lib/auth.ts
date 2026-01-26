@@ -2,6 +2,8 @@ import bcrypt from "bcrypt";
 import jwt from "jsonwebtoken";
 import { serialize, parse } from "cookie";
 import { Role } from "@/generated/prisma";
+import { NextRequest } from "next/server";
+import { prisma } from "@/lib/prisma";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const COOKIE_NAME = "collabos_token";
@@ -61,4 +63,28 @@ export function getTokenFromCookies(
   if (!cookieHeader) return null;
   const cookies = parse(cookieHeader);
   return cookies[COOKIE_NAME] || null;
+}
+
+export async function getCurrentUser(request: NextRequest) {
+  const cookieHeader = request.headers.get("cookie");
+  const token = getTokenFromCookies(cookieHeader);
+
+  if (!token) return null;
+
+  const payload = verifyToken(token);
+  if (!payload) return null;
+
+  const user = await prisma.user.findUnique({
+    where: { id: payload.userId },
+    select: {
+      id: true,
+      email: true,
+      name: true,
+      avatar: true,
+      role: true,
+      coins: true,
+    },
+  });
+
+  return user;
 }
