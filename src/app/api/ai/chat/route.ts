@@ -18,43 +18,61 @@ async function callGemini(prompt: string): Promise<string> {
     throw new Error("GEMINI_API_KEY is not configured");
   }
 
-  const response = await fetch(
-    `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.0-flash:generateContent?key=${GEMINI_API_KEY}`,
-    {
-      method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-      },
-      body: JSON.stringify({
-        contents: [
-          {
-            parts: [{ text: prompt }],
-          },
-        ],
-        generationConfig: {
-          temperature: 0.7,
-          topK: 40,
-          topP: 0.95,
-          maxOutputTokens: 1024,
-        },
-      }),
-    },
-  );
+  // Try gemini-1.5-flash first (often has separate/higher quota), fallback to 2.0-flash
+  const models = ["gemini-1.5-flash", "gemini-2.0-flash"];
 
-  if (!response.ok) {
-    const error = await response.text();
-    console.error("Gemini API error:", error);
+  for (const model of models) {
+    const response = await fetch(
+      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
+      {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({
+          contents: [
+            {
+              parts: [{ text: prompt }],
+            },
+          ],
+          generationConfig: {
+            temperature: 0.7,
+            topK: 40,
+            topP: 0.95,
+            maxOutputTokens: 1024,
+          },
+        }),
+      },
+    );
+
+    if (response.ok) {
+      const data = await response.json();
+      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
+      if (text) {
+        return text;
+      }
+      throw new Error("No response from AI");
+    }
+
+    const errorText = await response.text();
+    console.error(`Gemini API error (${model}):`, errorText);
+
+    // Check if rate limited - try next model
+    if (
+      errorText.includes("429") ||
+      errorText.includes("quota") ||
+      errorText.includes("RESOURCE_EXHAUSTED")
+    ) {
+      console.log(`Model ${model} rate limited, trying next...`);
+      continue;
+    }
+
+    // Other error - throw immediately
     throw new Error("Failed to get response from AI");
   }
 
-  const data = await response.json();
-  const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-
-  if (!text) {
-    throw new Error("No response from AI");
-  }
-
-  return text;
+  // All models exhausted
+  throw new Error("RATE_LIMIT_EXCEEDED");
 }
 
 export async function POST(request: NextRequest) {
@@ -174,6 +192,19 @@ export async function POST(request: NextRequest) {
         `ai-refund-${user.id}-${Date.now()}`,
       );
       console.error("AI call error:", error);
+
+      // Check for rate limit error
+      const errorMessage = error instanceof Error ? error.message : "";
+      if (errorMessage === "RATE_LIMIT_EXCEEDED") {
+        return NextResponse.json(
+          {
+            error:
+              "AI service quota exceeded. Please try again later or upgrade your plan. Coins refunded.",
+          },
+          { status: 429 },
+        );
+      }
+
       return NextResponse.json(
         { error: "Failed to get AI response. Coins refunded." },
         { status: 500 },

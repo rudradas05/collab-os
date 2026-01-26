@@ -9,6 +9,9 @@
     "lint": "eslint"
   },
   "dependencies": {
+    "@liveblocks/client": "^3.13.3",
+    "@liveblocks/node": "^3.13.3",
+    "@liveblocks/react": "^3.13.3",
     "@prisma/adapter-pg": "^7.3.0",
     "@prisma/client": "^7.3.0",
     "@radix-ui/react-alert-dialog": "^1.1.15",
@@ -36,6 +39,7 @@
     "react-dom": "19.2.3",
     "resend": "^6.8.0",
     "sonner": "^2.0.7",
+    "stripe": "^20.2.0",
     "tailwind-merge": "^3.4.0",
     "zod": "^4.3.6"
   },

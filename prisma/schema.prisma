@@ -129,3 +129,41 @@ model AIMessage {
   @@index([userId])
   @@index([workspaceId])
 }
+
+model ChatMessage {
+  id          String   @id @default(uuid())
+  userId      String
+  workspaceId String
+  content     String
+  createdAt   DateTime @default(now())
+
+  @@index([userId])
+  @@index([workspaceId])
+}
+
+model Subscription {
+  id                   String    @id @default(uuid())
+  userId               String    @unique
+  plan                 String
+  status               String
+  stripeCustomerId     String
+  stripeSubscriptionId String?
+  currentPeriodEnd     DateTime?
+  createdAt            DateTime  @default(now())
+
+  @@index([stripeCustomerId])
+  @@index([stripeSubscriptionId])
+}
+
+model Notification {
+  id        String   @id @default(uuid())
+  userId    String
+  title     String
+  message   String
+  type      String // INFO | SUCCESS | WARNING
+  read      Boolean  @default(false)
+  createdAt DateTime @default(now())
+
+  @@index([userId])
+  @@index([createdAt])
+}

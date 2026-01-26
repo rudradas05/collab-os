@@ -51,6 +51,13 @@ const getWorkspaceItems = (workspaceId: string) => [
     exact: false,
   },
   {
+    title: "Team Chat",
+    href: `/workspace/${workspaceId}/team-chat`,
+    icon: MessageSquare,
+    disabled: false,
+    exact: true,
+  },
+  {
     title: "AI Assistant",
     href: `/workspace/${workspaceId}/chat`,
     icon: Sparkles,

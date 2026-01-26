@@ -1,8 +1,17 @@
 import { redirect } from "next/navigation";
+import Link from "next/link";
 import { getCurrentUser } from "@/lib/session";
 import { getWorkspaceWithMembership } from "@/lib/workspace";
 import { prisma } from "@/lib/prisma";
-import { Building2, Users, Calendar, Crown, FolderKanban } from "lucide-react";
+import {
+  Building2,
+  Users,
+  Calendar,
+  Crown,
+  FolderKanban,
+  Plus,
+  ArrowRight,
+} from "lucide-react";
 import {
   Card,
   CardContent,
@@ -10,6 +19,7 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 
 export default async function WorkspacePage({
   params,
@@ -37,6 +47,22 @@ export default async function WorkspacePage({
   const owner = await prisma.user.findUnique({
     where: { id: workspace.ownerId },
     select: { name: true, email: true },
+  });
+
+  // Get workspace projects
+  const projects = await prisma.project.findMany({
+    where: { workspaceId: workspace.id },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+    include: {
+      _count: {
+        select: { tasks: true },
+      },
+    },
+  });
+
+  const totalProjects = await prisma.project.count({
+    where: { workspaceId: workspace.id },
   });
 
   return (
@@ -110,28 +136,83 @@ export default async function WorkspacePage({
       </div>
 
       <Card>
-        <CardHeader>
-          <CardTitle className="flex items-center gap-2">
-            <FolderKanban className="h-5 w-5" />
-            Projects
-          </CardTitle>
-          <CardDescription>
-            Projects feature will be available in the next update
-          </CardDescription>
+        <CardHeader className="flex flex-row items-center justify-between">
+          <div>
+            <CardTitle className="flex items-center gap-2">
+              <FolderKanban className="h-5 w-5" />
+              Projects
+            </CardTitle>
+            <CardDescription>
+              {totalProjects === 0
+                ? "Create your first project to get started"
+                : `${totalProjects} project${totalProjects === 1 ? "" : "s"} in this workspace`}
+            </CardDescription>
+          </div>
+          <Link href={`/workspace/${workspace.id}/projects`}>
+            <Button variant="outline" size="sm">
+              <Plus className="h-4 w-4 mr-1" />
+              New Project
+            </Button>
+          </Link>
         </CardHeader>
         <CardContent>
-          <div className="flex flex-col items-center justify-center py-12 text-center">
-            <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted mb-4">
-              <FolderKanban className="h-8 w-8 text-muted-foreground" />
+          {projects.length === 0 ? (
+            <div className="flex flex-col items-center justify-center py-12 text-center">
+              <div className="flex h-16 w-16 items-center justify-center rounded-2xl bg-muted mb-4">
+                <FolderKanban className="h-8 w-8 text-muted-foreground" />
+              </div>
+              <h3 className="text-lg font-semibold text-foreground mb-2">
+                No projects yet
+              </h3>
+              <p className="text-muted-foreground max-w-sm mb-4">
+                Projects help you organize your work and collaborate with your
+                team
+              </p>
+              <Link href={`/workspace/${workspace.id}/projects`}>
+                <Button>
+                  <Plus className="h-4 w-4 mr-2" />
+                  Create First Project
+                </Button>
+              </Link>
             </div>
-            <h3 className="text-lg font-semibold text-foreground mb-2">
-              No projects yet
-            </h3>
-            <p className="text-muted-foreground max-w-sm">
-              Projects will allow you to organize your work and collaborate with
-              your team
-            </p>
-          </div>
+          ) : (
+            <div className="space-y-3">
+              {projects.map((project) => (
+                <Link
+                  key={project.id}
+                  href={`/workspace/${workspace.id}/projects/${project.id}`}
+                  className="block"
+                >
+                  <div className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
+                        <FolderKanban className="h-5 w-5 text-primary" />
+                      </div>
+                      <div>
+                        <p className="font-medium">{project.name}</p>
+                        <p className="text-sm text-muted-foreground">
+                          {project._count.tasks} task
+                          {project._count.tasks === 1 ? "" : "s"}
+                        </p>
+                      </div>
+                    </div>
+                    <ArrowRight className="h-4 w-4 text-muted-foreground" />
+                  </div>
+                </Link>
+              ))}
+              {totalProjects > 5 && (
+                <Link
+                  href={`/workspace/${workspace.id}/projects`}
+                  className="block"
+                >
+                  <Button variant="ghost" className="w-full">
+                    View all {totalProjects} projects
+                    <ArrowRight className="h-4 w-4 ml-2" />
+                  </Button>
+                </Link>
+              )}
+            </div>
+          )}
         </CardContent>
       </Card>
     </div>
