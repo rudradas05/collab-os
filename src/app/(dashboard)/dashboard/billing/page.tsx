@@ -50,44 +50,48 @@ const PLAN_DETAILS: Record<
 > = {
   PRO: {
     name: "Pro",
-    price: 999,
+    price: 39900, // ₹399 in paisa
     icon: Sparkles,
     features: [
       "50 AI prompts per day",
       "Priority support",
-      "Up to 5 workspaces",
-      "Advanced analytics",
+      "Up to 10 workspaces",
+      "Up to 20 projects",
+      "Unlimited tasks",
     ],
     color: "text-blue-500",
   },
   ELITE: {
     name: "Elite",
-    price: 1999,
+    price: 99900, // ₹999 in paisa
     icon: Zap,
     features: [
       "200 AI prompts per day",
       "Dedicated support",
-      "Unlimited workspaces",
-      "Custom integrations",
+      "Up to 20 workspaces",
+      "Unlimited projects",
+      "Unlimited tasks",
     ],
     color: "text-purple-500",
   },
   LEGEND: {
     name: "Legend",
-    price: 4999,
+    price: 199900, // ₹1999 in paisa
     icon: Crown,
     features: [
       "Unlimited AI prompts",
       "24/7 Priority support",
-      "White-label options",
+      "Unlimited workspaces",
+      "Unlimited projects",
+      "Unlimited tasks",
       "API access",
     ],
     color: "text-amber-500",
   },
 };
 
-function formatPrice(cents: number): string {
-  return `$${(cents / 100).toFixed(2)}`;
+function formatPrice(paisa: number): string {
+  return `₹${(paisa / 100).toFixed(0)}`;
 }
 
 function BillingContent() {
@@ -237,7 +241,7 @@ function BillingContent() {
               <div>
                 <p className="text-2xl font-bold">{coins} coins</p>
                 <p className="text-sm text-muted-foreground">
-                  1 coin = $0.01 discount
+                  1 coin = ₹1 discount
                 </p>
               </div>
               <Separator />
@@ -256,8 +260,12 @@ function BillingContent() {
             const details = PLAN_DETAILS[plan];
             const Icon = details.icon;
             const isCurrentPlan = currentPlan === plan;
-            const priceAfterDiscount = Math.max(0, details.price - coins);
-            const effectiveDiscount = Math.min(coins, details.price);
+            const coinValueInPaisa = coins * 100; // 1 coin = 100 paisa (₹1)
+            const priceAfterDiscount = Math.max(
+              0,
+              details.price - coinValueInPaisa,
+            );
+            const effectiveDiscount = Math.min(coinValueInPaisa, details.price);
 
             return (
               <motion.div

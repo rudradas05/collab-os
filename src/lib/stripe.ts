@@ -13,30 +13,72 @@ function getStripe(): Stripe | null {
 export const stripe = getStripe();
 
 export type SubscriptionPlan = "PRO" | "ELITE" | "LEGEND";
+export type UserTier = "FREE" | SubscriptionPlan;
 
+// Prices in paisa (1 rupee = 100 paisa)
 export const PLAN_PRICES: Record<SubscriptionPlan, number> = {
-  PRO: 999, // $9.99 in cents
-  ELITE: 1999, // $19.99 in cents
-  LEGEND: 4999, // $49.99 in cents
+  PRO: 39900, // ₹399
+  ELITE: 99900, // ₹999
+  LEGEND: 199900, // ₹1999
+};
+
+// Plan limits configuration
+export const PLAN_LIMITS: Record<
+  UserTier,
+  {
+    maxWorkspaces: number;
+    maxProjects: number;
+    maxAIPromptsPerDay: number;
+    maxTasks: number; // -1 means unlimited
+  }
+> = {
+  FREE: {
+    maxWorkspaces: 2,
+    maxProjects: 5,
+    maxAIPromptsPerDay: 5,
+    maxTasks: -1, // unlimited
+  },
+  PRO: {
+    maxWorkspaces: 10,
+    maxProjects: 20,
+    maxAIPromptsPerDay: 50,
+    maxTasks: -1, // unlimited
+  },
+  ELITE: {
+    maxWorkspaces: 20,
+    maxProjects: -1, // unlimited
+    maxAIPromptsPerDay: 200,
+    maxTasks: -1, // unlimited
+  },
+  LEGEND: {
+    maxWorkspaces: -1, // unlimited
+    maxProjects: -1, // unlimited
+    maxAIPromptsPerDay: -1, // unlimited
+    maxTasks: -1, // unlimited
+  },
 };
 
 export const PLAN_FEATURES: Record<SubscriptionPlan, string[]> = {
   PRO: [
     "50 AI prompts per day",
     "Priority support",
-    "Up to 5 workspaces",
-    "Advanced analytics",
+    "Up to 10 workspaces",
+    "Up to 20 projects",
+    "Unlimited tasks",
   ],
   ELITE: [
     "200 AI prompts per day",
     "Dedicated support",
-    "Unlimited workspaces",
-    "Custom integrations",
+    "Up to 20 workspaces",
+    "Unlimited projects",
+    "Unlimited tasks",
   ],
   LEGEND: [
     "Unlimited AI prompts",
     "24/7 Priority support",
-    "White-label options",
+    "Unlimited workspaces",
+    "Unlimited projects",
+    "Unlimited tasks",
     "API access",
   ],
 };

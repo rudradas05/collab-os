@@ -162,7 +162,7 @@ export default async function DashboardPage() {
             <div className="mt-2 h-2 w-full rounded-full bg-secondary">
               <div
                 className="h-2 rounded-full bg-primary transition-all duration-500"
-                style={{ width: `${tierInfo.progressPercent}%` }}
+                style={{ width: `${tierInfo.progressPercent}%` } as React.CSSProperties}
               />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
@@ -324,7 +324,7 @@ export default async function DashboardPage() {
                                   ? "bg-amber-500"
                                   : "bg-muted-foreground/20",
                           )}
-                          style={{ width: `${progress}%` }}
+                          style={{ width: `${progress}%` } as React.CSSProperties}
                         />
                       </div>
                       <span className="text-[10px] text-muted-foreground">

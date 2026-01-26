@@ -30,13 +30,6 @@ export async function POST(request: NextRequest) {
       return rateLimitResponse(rateLimitResult);
     }
 
-    if (!stripe) {
-      return NextResponse.json(
-        { error: "Stripe is not configured" },
-        { status: 503 },
-      );
-    }
-
     const user = await getCurrentUser(request);
     if (!user) {
       return ApiErrors.unauthorized();
@@ -54,13 +47,6 @@ export async function POST(request: NextRequest) {
     if (!isValidPlan(plan)) {
       return ApiErrors.badRequest(
         "Invalid plan. Must be PRO, ELITE, or LEGEND.",
-      );
-    }
-
-    const priceId = getPriceId(plan);
-    if (!priceId) {
-      return ApiErrors.internalError(
-        `Price ID not configured for ${plan} plan`,
       );
     }
 
@@ -88,26 +74,17 @@ export async function POST(request: NextRequest) {
     }
 
     const planPrice = PLAN_PRICES[plan as SubscriptionPlan];
-    const coinDiscount = Math.min(userData.coins, planPrice); // 1 coin = 1 cent
+    const coinValueInPaisa = userData.coins * 100; // 1 coin = 100 paisa (₹1)
+    const coinDiscount = Math.min(coinValueInPaisa, planPrice);
+    const coinsToDeduct = Math.ceil(coinDiscount / 100); // Convert back to coins
     const amountAfterDiscount = planPrice - coinDiscount;
 
-    // Get or create Stripe customer
-    let stripeCustomerId = existingSubscription?.stripeCustomerId;
-
-    if (!stripeCustomerId) {
-      const customer = await stripe.customers.create({
-        email: userData.email,
-        metadata: { userId: user.id },
-      });
-      stripeCustomerId = customer.id;
-    }
-
-    // If full discount covers the price, create subscription directly
+    // If full discount covers the price, create subscription directly (no Stripe needed)
     if (amountAfterDiscount <= 0) {
       // Deduct coins
       const coinResult = await addCoins(
         user.id,
-        -planPrice,
+        -coinsToDeduct,
         `Subscription to ${plan} plan (full coin payment)`,
         `subscription-${user.id}-${plan}-${Date.now()}`,
       );
@@ -125,16 +102,14 @@ export async function POST(request: NextRequest) {
         update: {
           plan,
           status: "active",
-          stripeCustomerId,
-          stripeSubscriptionId: null,
+          stripeCustomerId: existingSubscription?.stripeCustomerId ?? undefined,
+          stripeSubscriptionId: undefined,
           currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000), // 30 days
         },
         create: {
           userId: user.id,
           plan,
           status: "active",
-          stripeCustomerId,
-          stripeSubscriptionId: null,
           currentPeriodEnd: new Date(Date.now() + 30 * 24 * 60 * 60 * 1000),
         },
       });
@@ -153,9 +128,38 @@ export async function POST(request: NextRequest) {
           plan: subscription.plan,
           status: subscription.status,
         },
-        coinsUsed: planPrice,
+        coinsUsed: coinsToDeduct,
         amountCharged: 0,
       });
+    }
+
+    // For partial or no coin discount, Stripe is required
+    if (!stripe) {
+      return NextResponse.json(
+        {
+          error:
+            "Stripe is not configured. You need more coins to cover the full plan price.",
+        },
+        { status: 503 },
+      );
+    }
+
+    const priceId = getPriceId(plan);
+    if (!priceId) {
+      return ApiErrors.internalError(
+        `Price ID not configured for ${plan} plan`,
+      );
+    }
+
+    // Get or create Stripe customer
+    let stripeCustomerId = existingSubscription?.stripeCustomerId;
+
+    if (!stripeCustomerId) {
+      const customer = await stripe.customers.create({
+        email: userData.email,
+        metadata: { userId: user.id },
+      });
+      stripeCustomerId = customer.id;
     }
 
     // Create Stripe Checkout session with discount
@@ -183,14 +187,15 @@ export async function POST(request: NextRequest) {
         userId: user.id,
         plan,
         coinDiscount: coinDiscount.toString(),
+        coinsUsed: coinsToDeduct.toString(),
       },
     });
 
     // Deduct coins now (before redirect)
-    if (coinDiscount > 0) {
+    if (coinsToDeduct > 0) {
       await addCoins(
         user.id,
-        -coinDiscount,
+        -coinsToDeduct,
         `Subscription discount for ${plan} plan`,
         `subscription-discount-${session.id}`,
       );
@@ -200,6 +205,7 @@ export async function POST(request: NextRequest) {
       sessionId: session.id,
       url: session.url,
       coinDiscount,
+      coinsUsed: coinsToDeduct,
       amountAfterDiscount,
     });
   } catch (error) {

@@ -115,15 +115,14 @@ export async function addCoins(
     }
 
     const newBalance = Math.max(0, currentUser.coins + amount);
-    const newTier = recalcTier(newBalance);
 
     // Use transaction to ensure atomicity
+    // Note: Tier is NOT updated based on coins - tier only changes when user purchases a subscription
     const [updatedUser, transaction] = await prisma.$transaction([
       prisma.user.update({
         where: { id: userId },
         data: {
           coins: newBalance,
-          tier: newTier,
         },
       }),
       prisma.coinTransaction.create({

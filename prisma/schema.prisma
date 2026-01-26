@@ -157,7 +157,7 @@ model Subscription {
   userId               String    @unique
   plan                 String
   status               String
-  stripeCustomerId     String
+  stripeCustomerId     String? // Optional for coin-only payments
   stripeSubscriptionId String?
   currentPeriodEnd     DateTime?
   createdAt            DateTime  @default(now())

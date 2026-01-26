@@ -1,36 +1,53 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# CollabOS+
 
-## Getting Started
+A collaboration platform where teams can manage their work together. Built this to help small teams organize projects, track tasks, and stay connected.
 
-First, run the development server:
+## What it does
+
+**Workspaces** — Create separate spaces for different teams or clients. Each workspace has its own projects, members, and settings.
+
+**Projects & Tasks** — Organize work with a simple kanban board. Drag tasks between columns, set priorities, assign to teammates.
+
+**Team Chat** — Real-time messaging within workspaces. No need to switch between apps.
+
+**AI Assistant** — Ask questions, get help with tasks, brainstorm ideas. Powered by Gemini.
+
+**Notifications** — Stay updated on what matters. Get notified about task assignments, mentions, and team activity.
+
+## Roles
+
+- **Owner** — Full control over the workspace
+- **Admin** — Can manage members and settings
+- **Member** — Can work on projects and tasks
+
+## Plans
+
+| Plan   | Price | What you get                      |
+| ------ | ----- | --------------------------------- |
+| Free   | ₹0    | 2 workspaces, 5 projects          |
+| Pro    | ₹399  | 10 workspaces, 20 projects        |
+| Elite  | ₹999  | 20 workspaces, unlimited projects |
+| Legend | ₹1999 | Everything unlimited              |
+
+You can also earn coins by using the platform and spend them on upgrades.
+
+## Running locally
 
 ```bash
+npm install
+npx prisma generate
+npx prisma migrate dev
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Then open http://localhost:3000
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+## Deploying
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+Works great on Vercel. Just connect your repo, add the environment variables, and you're good to go.
 
-## Learn More
+Make sure to set up your Stripe webhooks pointing to `/api/subscription/webhook`.
 
-To learn more about Next.js, take a look at the following resources:
+## Built with
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Next.js, React, TypeScript, Tailwind, Prisma, PostgreSQL, Stripe, Liveblocks, Gemini

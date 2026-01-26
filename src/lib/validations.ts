@@ -200,7 +200,7 @@ export const chatMessageSchema = z
 
 export const createSubscriptionSchema = z
   .object({
-    plan: z.enum(["monthly", "yearly"]),
+    plan: z.enum(["PRO", "ELITE", "LEGEND"]),
     useCoins: z.boolean().optional(),
     coinsToUse: z.number().int().min(0).max(1000000).optional(),
   })

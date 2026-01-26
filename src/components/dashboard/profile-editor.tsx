@@ -1,13 +1,31 @@
 "use client";
 
 import { useState } from "react";
+import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { Separator } from "@/components/ui/separator";
-import { Coins, Pencil, Save, X, Loader2, Camera } from "lucide-react";
+import {
+  Coins,
+  Pencil,
+  Save,
+  X,
+  Loader2,
+  Camera,
+  Sparkles,
+  Zap,
+  Crown,
+} from "lucide-react";
 import type { Tier } from "@/lib/coins";
+
+// Plan prices in rupees (1 coin = ₹1)
+const PLAN_PRICES = {
+  PRO: 399,
+  ELITE: 999,
+  LEGEND: 1999,
+};
 
 const tierColors: Record<Tier, { bg: string; text: string; border: string }> = {
   FREE: { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-300" },
@@ -43,14 +61,92 @@ interface ProfileEditorProps {
 }
 
 export function ProfileEditor({ user, tierInfo }: ProfileEditorProps) {
+  const router = useRouter();
   const [isEditing, setIsEditing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
+  const [isUpgrading, setIsUpgrading] = useState(false);
   const [name, setName] = useState(user.name);
   const [avatar, setAvatar] = useState(user.avatar || "");
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
   const tierStyle = tierColors[user.tier];
+
+  // Calculate which plans the user can afford
+  const canAffordPro = user.coins >= PLAN_PRICES.PRO;
+  const canAffordElite = user.coins >= PLAN_PRICES.ELITE;
+  const canAffordLegend = user.coins >= PLAN_PRICES.LEGEND;
+
+  // Get the best plan user can afford (that's higher than current)
+  const getAffordableUpgrade = (): {
+    plan: "PRO" | "ELITE" | "LEGEND";
+    price: number;
+    icon: typeof Sparkles;
+    color: string;
+  } | null => {
+    const tierOrder = ["FREE", "PRO", "ELITE", "LEGEND"];
+    const currentIndex = tierOrder.indexOf(user.tier);
+
+    if (canAffordLegend && currentIndex < 3) {
+      return {
+        plan: "LEGEND",
+        price: PLAN_PRICES.LEGEND,
+        icon: Crown,
+        color: "text-amber-500",
+      };
+    }
+    if (canAffordElite && currentIndex < 2) {
+      return {
+        plan: "ELITE",
+        price: PLAN_PRICES.ELITE,
+        icon: Zap,
+        color: "text-purple-500",
+      };
+    }
+    if (canAffordPro && currentIndex < 1) {
+      return {
+        plan: "PRO",
+        price: PLAN_PRICES.PRO,
+        icon: Sparkles,
+        color: "text-blue-500",
+      };
+    }
+    return null;
+  };
+
+  const affordableUpgrade = getAffordableUpgrade();
+
+  const handleUpgrade = async (plan: string) => {
+    setIsUpgrading(true);
+    setError(null);
+
+    try {
+      const response = await fetch("/api/subscription/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ plan }),
+      });
+
+      const data = await response.json();
+
+      if (!response.ok) {
+        throw new Error(data.error || "Failed to upgrade");
+      }
+
+      if (data.success) {
+        setSuccessMessage(`Successfully upgraded to ${plan}!`);
+        setTimeout(() => {
+          window.location.reload();
+        }, 1500);
+      } else if (data.url) {
+        router.push(data.url);
+      }
+    } catch (err) {
+      setError(err instanceof Error ? err.message : "Failed to upgrade");
+    } finally {
+      setIsUpgrading(false);
+    }
+  };
 
   const getInitials = (name: string) => {
     return name
@@ -274,24 +370,134 @@ export function ProfileEditor({ user, tierInfo }: ProfileEditorProps) {
         </div>
       )}
 
-      {/* Tier Progress */}
-      <div className="space-y-2">
+      {/* Coin Balance & Upgrade Section */}
+      <div className="space-y-4">
         <div className="flex items-center justify-between">
-          <p className="text-sm font-medium text-muted-foreground">
-            Progress to {tierInfo.nextTier ?? "Max Tier"}
-          </p>
-          <p className="text-sm font-medium">{tierInfo.progressPercent}%</p>
+          <div className="flex items-center gap-2">
+            <Coins className="h-5 w-5 text-primary" />
+            <span className="text-lg font-semibold">{user.coins} coins</span>
+            <span className="text-sm text-muted-foreground">
+              (₹{user.coins} value)
+            </span>
+          </div>
+          {user.tier !== "LEGEND" && (
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={() => router.push("/dashboard/billing")}
+            >
+              View Plans
+            </Button>
+          )}
         </div>
-        <div className="h-2 w-full rounded-full bg-secondary">
-          <div
-            className="h-2 rounded-full bg-primary transition-all duration-500"
-            style={{ width: `${tierInfo.progressPercent}%` }}
-          />
-        </div>
-        {tierInfo.nextTier && (
-          <p className="text-xs text-muted-foreground">
-            {tierInfo.coinsToNext} more coins needed for {tierInfo.nextTier}
-          </p>
+
+        {/* Affordable Plans */}
+        {affordableUpgrade && (
+          <div className="rounded-lg border border-primary/30 bg-primary/5 p-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-3">
+                <div
+                  className={`flex h-10 w-10 items-center justify-center rounded-lg ${
+                    affordableUpgrade.plan === "LEGEND"
+                      ? "bg-amber-100"
+                      : affordableUpgrade.plan === "ELITE"
+                        ? "bg-purple-100"
+                        : "bg-blue-100"
+                  }`}
+                >
+                  <affordableUpgrade.icon
+                    className={`h-5 w-5 ${affordableUpgrade.color}`}
+                  />
+                </div>
+                <div>
+                  <p className="font-semibold">
+                    You can afford {affordableUpgrade.plan}!
+                  </p>
+                  <p className="text-sm text-muted-foreground">
+                    Use {affordableUpgrade.price} coins to upgrade
+                  </p>
+                </div>
+              </div>
+              <Button
+                onClick={() => handleUpgrade(affordableUpgrade.plan)}
+                disabled={isUpgrading}
+                className={
+                  affordableUpgrade.plan === "LEGEND"
+                    ? "bg-amber-500 hover:bg-amber-600"
+                    : affordableUpgrade.plan === "ELITE"
+                      ? "bg-purple-500 hover:bg-purple-600"
+                      : "bg-blue-500 hover:bg-blue-600"
+                }
+              >
+                {isUpgrading ? (
+                  <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                ) : (
+                  <affordableUpgrade.icon className="h-4 w-4 mr-2" />
+                )}
+                Upgrade Now
+              </Button>
+            </div>
+          </div>
+        )}
+
+        {/* Progress to LEGEND - always show unless already LEGEND */}
+        {user.tier !== "LEGEND" && (
+          <div className="space-y-2">
+            <div className="flex items-center justify-between text-sm">
+              <span className="text-muted-foreground flex items-center gap-1">
+                <Crown className="h-4 w-4 text-amber-500" />
+                Progress to LEGEND
+              </span>
+              <span className="font-medium">
+                {user.coins} / {PLAN_PRICES.LEGEND} coins
+              </span>
+            </div>
+            <div className="h-2 w-full rounded-full bg-secondary">
+              <div
+                className="h-2 rounded-full bg-linear-to-r from-blue-500 via-purple-500 to-amber-500 transition-all duration-500"
+                style={{
+                  width: `${Math.min(100, (user.coins / PLAN_PRICES.LEGEND) * 100)}%`,
+                }}
+              />
+            </div>
+            <div className="flex items-center justify-between text-xs text-muted-foreground">
+              <span>
+                {user.coins >= PLAN_PRICES.LEGEND
+                  ? "You can afford LEGEND!"
+                  : `${PLAN_PRICES.LEGEND - user.coins} more coins needed`}
+              </span>
+              <div className="flex items-center gap-4">
+                {user.coins < PLAN_PRICES.PRO && (
+                  <span className="flex items-center gap-1">
+                    <Zap className="h-3 w-3 text-blue-500" />
+                    PRO: {PLAN_PRICES.PRO}
+                  </span>
+                )}
+                {user.coins < PLAN_PRICES.ELITE && (
+                  <span className="flex items-center gap-1">
+                    <Sparkles className="h-3 w-3 text-purple-500" />
+                    ELITE: {PLAN_PRICES.ELITE}
+                  </span>
+                )}
+                <span className="flex items-center gap-1">
+                  <Crown className="h-3 w-3 text-amber-500" />
+                  LEGEND: {PLAN_PRICES.LEGEND}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {user.tier === "LEGEND" && (
+          <div className="rounded-lg border border-amber-200 bg-amber-50 p-4 text-center">
+            <Crown className="h-8 w-8 text-amber-500 mx-auto mb-2" />
+            <p className="font-semibold text-amber-700">
+              You have the highest tier!
+            </p>
+            <p className="text-sm text-amber-600">
+              Enjoy unlimited access to all features
+            </p>
+          </div>
         )}
       </div>
     </div>

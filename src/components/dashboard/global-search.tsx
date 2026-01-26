@@ -46,70 +46,58 @@ export function GlobalSearch() {
   const [isLoading, setIsLoading] = useState(false);
   const inputRef = useRef<HTMLInputElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const abortControllerRef = useRef<AbortController | null>(null);
+  const cacheRef = useRef<Map<string, SearchResult>>(new Map());
 
   const searchData = useCallback(async (searchQuery: string) => {
-    if (!searchQuery.trim()) {
+    if (!searchQuery.trim() || searchQuery.length < 2) {
       setResults({ workspaces: [], projects: [], tasks: [] });
       return;
     }
 
+    // Check cache first
+    const cached = cacheRef.current.get(searchQuery.toLowerCase());
+    if (cached) {
+      setResults(cached);
+      return;
+    }
+
+    // Cancel previous request
+    if (abortControllerRef.current) {
+      abortControllerRef.current.abort();
+    }
+    abortControllerRef.current = new AbortController();
+
     setIsLoading(true);
     try {
-      // Fetch workspaces
-      const workspacesRes = await fetch("/api/workspaces");
-      const workspacesData = await workspacesRes.json();
-      const workspaces = (workspacesData.workspaces || []).filter(
-        (w: Workspace) =>
-          w.name.toLowerCase().includes(searchQuery.toLowerCase()),
+      // Use the fast search API endpoint (single query instead of N+1)
+      const response = await fetch(
+        `/api/search?q=${encodeURIComponent(searchQuery)}`,
+        { signal: abortControllerRef.current.signal },
       );
 
-      // Fetch projects from all workspaces
-      const allProjects: Project[] = [];
-      const allTasks: Task[] = [];
+      if (!response.ok) throw new Error("Search failed");
 
-      for (const workspace of workspacesData.workspaces || []) {
-        const projectsRes = await fetch(
-          `/api/projects?workspaceId=${workspace.id}`,
-        );
-        const projectsData = await projectsRes.json();
+      const data = await response.json();
+      const result = {
+        workspaces: data.workspaces || [],
+        projects: data.projects || [],
+        tasks: data.tasks || [],
+      };
 
-        const matchingProjects = (projectsData.projects || [])
-          .filter((p: Project) =>
-            p.name.toLowerCase().includes(searchQuery.toLowerCase()),
-          )
-          .map((p: Project) => ({
-            ...p,
-            workspaceName: workspace.name,
-          }));
-
-        allProjects.push(...matchingProjects);
-
-        // Fetch tasks for each project
-        for (const project of projectsData.projects || []) {
-          const tasksRes = await fetch(`/api/tasks?projectId=${project.id}`);
-          const tasksData = await tasksRes.json();
-
-          const matchingTasks = (tasksData.tasks || [])
-            .filter((t: Task) =>
-              t.title.toLowerCase().includes(searchQuery.toLowerCase()),
-            )
-            .map((t: Task) => ({
-              ...t,
-              projectName: project.name,
-              workspaceId: workspace.id,
-            }));
-
-          allTasks.push(...matchingTasks);
-        }
+      // Cache the result
+      cacheRef.current.set(searchQuery.toLowerCase(), result);
+      // Limit cache size
+      if (cacheRef.current.size > 50) {
+        const firstKey = cacheRef.current.keys().next().value;
+        if (firstKey) cacheRef.current.delete(firstKey);
       }
 
-      setResults({
-        workspaces: workspaces.slice(0, 3),
-        projects: allProjects.slice(0, 3),
-        tasks: allTasks.slice(0, 5),
-      });
+      setResults(result);
     } catch (error) {
-      console.error("Search error:", error);
+      if ((error as Error).name !== "AbortError") {
+        console.error("Search error:", error);
+      }
     } finally {
       setIsLoading(false);
     }
@@ -120,7 +108,7 @@ export function GlobalSearch() {
       if (query) {
         searchData(query);
       }
-    }, 300);
+    }, 150); // Reduced debounce for faster response
 
     return () => clearTimeout(timer);
   }, [query, searchData]);
@@ -198,6 +186,8 @@ export function GlobalSearch() {
                 setResults({ workspaces: [], projects: [], tasks: [] });
               }}
               className="p-1 hover:bg-muted rounded"
+              aria-label="Clear search"
+              title="Clear search"
             >
               <X className="h-3.5 w-3.5 text-muted-foreground" />
             </button>

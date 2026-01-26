@@ -8,6 +8,7 @@ import {
   requireWorkspaceMember,
   requireWorkspaceAdminOrOwner,
 } from "@/lib/workspace";
+import { PLAN_LIMITS, type UserTier } from "@/lib/stripe";
 import {
   checkRateLimit,
   rateLimitResponse,
@@ -87,6 +88,38 @@ export async function POST(request: NextRequest) {
       return ApiErrors.forbidden(
         "Only workspace owners or admins can create projects",
       );
+    }
+
+    // Check project limit based on user's tier
+    const userData = await prisma.user.findUnique({
+      where: { id: user.id },
+      select: { tier: true },
+    });
+
+    const userTier = (userData?.tier || "FREE") as UserTier;
+    const limits = PLAN_LIMITS[userTier];
+
+    if (limits.maxProjects !== -1) {
+      // Count projects across all workspaces the user owns or is admin of
+      const userWorkspaces = await prisma.workspaceMember.findMany({
+        where: {
+          userId: user.id,
+          role: { in: ["OWNER", "ADMIN"] },
+        },
+        select: { workspaceId: true },
+      });
+
+      const workspaceIds = userWorkspaces.map((w) => w.workspaceId);
+
+      const currentProjectCount = await prisma.project.count({
+        where: { workspaceId: { in: workspaceIds } },
+      });
+
+      if (currentProjectCount >= limits.maxProjects) {
+        return ApiErrors.forbidden(
+          `You've reached the maximum of ${limits.maxProjects} projects for your ${userTier} plan. Upgrade to create more.`,
+        );
+      }
     }
 
     const project = await prisma.project.create({

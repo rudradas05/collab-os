@@ -9,6 +9,7 @@ import { createWorkspaceSchema } from "@/lib/validations";
 import { WorkspaceRole } from "@/generated/prisma";
 import { createNotification } from "@/lib/notifications";
 import { sendWorkspaceCreatedEmail } from "@/lib/email";
+import { PLAN_LIMITS, type UserTier } from "@/lib/stripe";
 import {
   checkRateLimit,
   rateLimitResponse,
@@ -41,14 +42,33 @@ export async function POST(request: NextRequest) {
       return unauthorizedResponse("Invalid token");
     }
 
-    // Any authenticated user can create their own workspace
+    // Get user with tier info
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { id: true, name: true, email: true },
+      select: { id: true, name: true, email: true, tier: true },
     });
 
     if (!user) {
       return ApiErrors.unauthorized("User not found");
+    }
+
+    // Check workspace limit based on user's tier
+    const userTier = (user.tier || "FREE") as UserTier;
+    const limits = PLAN_LIMITS[userTier];
+
+    if (limits.maxWorkspaces !== -1) {
+      const currentWorkspaceCount = await prisma.workspaceMember.count({
+        where: {
+          userId: user.id,
+          role: WorkspaceRole.OWNER, // Only count workspaces they own
+        },
+      });
+
+      if (currentWorkspaceCount >= limits.maxWorkspaces) {
+        return ApiErrors.forbidden(
+          `You've reached the maximum of ${limits.maxWorkspaces} workspaces for your ${userTier} plan. Upgrade to create more.`,
+        );
+      }
     }
 
     const body = await request.json();
