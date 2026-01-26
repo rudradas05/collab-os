@@ -142,10 +142,11 @@ function BillingContent() {
       const result = await response.json();
 
       if (!response.ok) {
-        // Check if it's a Stripe-related error
+        // For any Stripe/payment/price error, always show the same friendly toast
         if (
-          result.error?.includes("Stripe") ||
-          result.error?.includes("payment")
+          result.error?.toLowerCase().includes("stripe") ||
+          result.error?.toLowerCase().includes("payment") ||
+          result.error?.toLowerCase().includes("price id not configured")
         ) {
           toast.error("Card payments coming soon! Use your coins to upgrade.");
         } else {
@@ -166,6 +167,7 @@ function BillingContent() {
         return;
       }
     } catch (error) {
+      // For any error (including network/Stripe), show only the friendly toast
       console.error("Upgrade error:", error);
       toast.error("Card payments coming soon! Use your coins to upgrade.");
     } finally {
