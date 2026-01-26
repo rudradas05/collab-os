@@ -1,18 +1,17 @@
 import cloudinary from "./cloudinary";
 
 export async function uploadAvatar(file: File, userId: string) {
-  const buffer = Buffer.from(await file.arrayBuffer());
+  const bytes = await file.arrayBuffer();
+  const buffer = Buffer.from(bytes);
 
   return new Promise<string>((resolve, reject) => {
     cloudinary.uploader
       .upload_stream(
         {
           folder: "avatars",
-          public_id: userId, // overwrite per user
+          public_id: userId,
+          overwrite: true,
           resource_type: "image",
-          transformation: [
-            { width: 256, height: 256, crop: "fill", gravity: "face" },
-          ],
         },
         (error, result) => {
           if (error || !result) {

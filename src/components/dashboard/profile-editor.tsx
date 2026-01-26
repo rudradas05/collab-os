@@ -203,6 +203,7 @@ export function ProfileEditor({ user, tierInfo }: ProfileEditorProps) {
       setSuccessMessage("Profile updated successfully!");
       setIsEditing(false);
       setAvatarFile(null);
+      setAvatar(user.avatar || ""); // reset to persisted avatar
 
       setTimeout(() => window.location.reload(), 800);
     } catch (err) {
@@ -254,8 +255,13 @@ export function ProfileEditor({ user, tierInfo }: ProfileEditorProps) {
                 }
 
                 setAvatarFile(file);
-                const previewUrl = URL.createObjectURL(file);
-                setAvatar(previewUrl);
+
+                setAvatar((prev) => {
+                  if (prev?.startsWith("blob:")) {
+                    URL.revokeObjectURL(prev); // ✅ revoke OLD preview
+                  }
+                  return URL.createObjectURL(file);
+                });
               }}
             />
 
@@ -264,7 +270,7 @@ export function ProfileEditor({ user, tierInfo }: ProfileEditorProps) {
               className={`h-20 w-20 transition-all duration-300 ${
                 isEditing
                   ? "cursor-pointer hover:ring-4 hover:ring-primary/20 hover:scale-105"
-                  : ""
+                  : "pointer-events-none"
               }`}
               onClick={() => {
                 if (isEditing && !isSaving) {
