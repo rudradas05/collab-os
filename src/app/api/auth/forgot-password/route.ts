@@ -63,7 +63,23 @@ export async function POST(request: NextRequest) {
     const emailResult = await sendPasswordResetOTP(email, otp, user.name);
 
     if (!emailResult.success) {
-      console.error("Failed to send password reset email:", emailResult.error);
+      const error = emailResult.error as {
+        statusCode?: number;
+        message?: string;
+      };
+      console.error("Failed to send password reset email:", error);
+
+      // Check for Resend domain verification error
+      if (error?.statusCode === 403) {
+        return NextResponse.json(
+          {
+            error:
+              "Email service not configured for this recipient. Please contact support or use a verified email.",
+          },
+          { status: 503 },
+        );
+      }
+
       return NextResponse.json(
         { error: "Failed to send email. Please try again later." },
         { status: 500 },
