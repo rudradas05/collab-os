@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { addCoins, type Tier } from "@/lib/coins";
 import { aiChatSchema } from "@/lib/validations";
+import { GoogleGenerativeAI } from "@google/generative-ai";
 import {
   checkRateLimit,
   rateLimitResponse,
@@ -11,8 +12,14 @@ import {
 } from "@/lib/rate-limit";
 import { handleZodError, ApiErrors } from "@/lib/api-errors";
 
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+
 const AI_COST = 2;
+
+
+
+const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
+
+console.log("GEMINI KEY OK:", !!process.env.GEMINI_API_KEY);
 
 const TIER_DAILY_LIMITS: Record<Tier, number> = {
   FREE: 5,
@@ -21,66 +28,33 @@ const TIER_DAILY_LIMITS: Record<Tier, number> = {
   LEGEND: Infinity,
 };
 
+
+
 async function callGemini(prompt: string): Promise<string> {
-  if (!GEMINI_API_KEY) {
-    throw new Error("GEMINI_API_KEY is not configured");
-  }
+  try {
+    const model = genAI.getGenerativeModel({
+      model: "gemini-2.5-flash",
+    });
 
-  // Try gemini-1.5-flash first (often has separate/higher quota), fallback to 2.0-flash
-  const models = ["gemini-1.5-flash", "gemini-2.0-flash"];
+    const result = await model.generateContent(prompt);
 
-  for (const model of models) {
-    const response = await fetch(
-      `https://generativelanguage.googleapis.com/v1beta/models/${model}:generateContent?key=${GEMINI_API_KEY}`,
-      {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({
-          contents: [
-            {
-              parts: [{ text: prompt }],
-            },
-          ],
-          generationConfig: {
-            temperature: 0.7,
-            topK: 40,
-            topP: 0.95,
-            maxOutputTokens: 1024,
-          },
-        }),
-      },
-    );
+    const response = result.response;
+    const text = response.text();
 
-    if (response.ok) {
-      const data = await response.json();
-      const text = data.candidates?.[0]?.content?.parts?.[0]?.text;
-      if (text) {
-        return text;
-      }
-      throw new Error("No response from AI");
+    if (!text) {
+      throw new Error("EMPTY_RESPONSE");
     }
 
-    const errorText = await response.text();
-    console.error(`Gemini API error (${model}):`, errorText);
+    return text;
+  } catch (error: any) {
+    console.error("Gemini error:", error);
 
-    // Check if rate limited - try next model
-    if (
-      errorText.includes("429") ||
-      errorText.includes("quota") ||
-      errorText.includes("RESOURCE_EXHAUSTED")
-    ) {
-      console.log(`Model ${model} rate limited, trying next...`);
-      continue;
+    if (error?.message?.includes("quota") || error?.status === 429) {
+      throw new Error("RATE_LIMIT_EXCEEDED");
     }
 
-    // Other error - throw immediately
-    throw new Error("Failed to get response from AI");
+    throw new Error("AI_FAILED");
   }
-
-  // All models exhausted
-  throw new Error("RATE_LIMIT_EXCEEDED");
 }
 
 export async function POST(request: NextRequest) {
