@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { getNextTierInfo, type Tier } from "@/lib/coins";
+import { getProgressFromSubscriptionTier, type Tier } from "@/lib/coins";
+
 import {
   Card,
   CardContent,
@@ -49,8 +50,11 @@ export default async function ProfilePage() {
     },
   });
 
-  const tierInfo = getNextTierInfo(user?.coins ?? 0);
-  const currentTier = (user?.tier as Tier) || "FREE";
+  const subscriptionTier = (user?.tier as Tier) || "FREE";
+  const coins = user?.coins ?? 0;
+
+  const { nextTier, coinsToNext, progressPercent } =
+    getProgressFromSubscriptionTier(coins, subscriptionTier);
 
   // Prepare user data for the client component
   const userData = {
@@ -60,14 +64,14 @@ export default async function ProfilePage() {
     role: user?.role || "USER",
     avatar: user?.avatar || null,
     coins: user?.coins ?? 0,
-    tier: currentTier,
+    tier: subscriptionTier,
   };
 
   const tierData = {
-    currentTier,
-    nextTier: tierInfo.nextTier,
-    coinsToNext: tierInfo.coinsToNext,
-    progressPercent: tierInfo.progressPercent,
+    currentTier: subscriptionTier,
+    nextTier,
+    coinsToNext,
+    progressPercent,
   };
 
   return (

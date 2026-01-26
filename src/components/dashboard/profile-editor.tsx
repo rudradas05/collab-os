@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -19,6 +19,14 @@ import {
   Crown,
 } from "lucide-react";
 import type { Tier } from "@/lib/coins";
+
+// Define the minimum coin thresholds for each tier
+const TIER_THRESHOLDS: Record<Tier, { min: number }> = {
+  FREE: { min: 0 },
+  PRO: { min: 399 },
+  ELITE: { min: 999 },
+  LEGEND: { min: 1999 },
+};
 
 // Plan prices in rupees (1 coin = ₹1)
 const PLAN_PRICES = {
@@ -67,6 +75,7 @@ export function ProfileEditor({ user, tierInfo }: ProfileEditorProps) {
   const [isUpgrading, setIsUpgrading] = useState(false);
   const [name, setName] = useState(user.name);
   const [avatar, setAvatar] = useState(user.avatar || "");
+  const [avatarFile, setAvatarFile] = useState<File | null>(null);
   const [error, setError] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
 
@@ -161,6 +170,7 @@ export function ProfileEditor({ user, tierInfo }: ProfileEditorProps) {
   const handleCancel = () => {
     setName(user.name);
     setAvatar(user.avatar || "");
+    setAvatarFile(null);
     setIsEditing(false);
     setError(null);
   };
@@ -171,49 +181,44 @@ export function ProfileEditor({ user, tierInfo }: ProfileEditorProps) {
       return;
     }
 
-    // Validate avatar URL if provided
-    if (avatar.trim()) {
-      try {
-        new URL(avatar.trim());
-      } catch {
-        setError("Please enter a valid avatar URL");
-        return;
-      }
+    const formData = new FormData();
+    formData.append("name", name.trim());
+
+    if (avatarFile) {
+      formData.append("avatar", avatarFile);
     }
 
     setIsSaving(true);
     setError(null);
-    setSuccessMessage(null);
 
     try {
-      const response = await fetch("/api/auth/profile", {
+      const res = await fetch("/api/auth/profile", {
         method: "PATCH",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          name: name.trim(),
-          avatar: avatar.trim() || null,
-        }),
+        body: formData, // ✅ NOT JSON
       });
 
-      const data = await response.json();
-
-      if (!response.ok) {
-        throw new Error(data.error || "Failed to update profile");
-      }
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error);
 
       setSuccessMessage("Profile updated successfully!");
       setIsEditing(false);
+      setAvatarFile(null);
 
-      // Refresh the page to get updated data
-      setTimeout(() => {
-        window.location.reload();
-      }, 1000);
+      setTimeout(() => window.location.reload(), 800);
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to update profile");
+      setError(err instanceof Error ? err.message : "Update failed");
     } finally {
       setIsSaving(false);
     }
   };
+
+  useEffect(() => {
+    return () => {
+      if (avatar?.startsWith("blob:")) {
+        URL.revokeObjectURL(avatar);
+      }
+    };
+  }, [avatar]);
 
   return (
     <div className="space-y-6">
@@ -233,7 +238,40 @@ export function ProfileEditor({ user, tierInfo }: ProfileEditorProps) {
       <div className="flex items-center justify-between">
         <div className="flex items-center gap-4">
           <div className="relative">
-            <Avatar className="h-20 w-20 transition-all duration-300 hover:ring-4 hover:ring-primary/20 hover:scale-105">
+            {/* Hidden file input */}
+            <input
+              type="file"
+              accept="image/*"
+              hidden
+              id="avatar-input"
+              onChange={(e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+
+                if (!file.type.startsWith("image/")) {
+                  setError("Please select an image file");
+                  return;
+                }
+
+                setAvatarFile(file);
+                const previewUrl = URL.createObjectURL(file);
+                setAvatar(previewUrl);
+              }}
+            />
+
+            {/* Avatar */}
+            <Avatar
+              className={`h-20 w-20 transition-all duration-300 ${
+                isEditing
+                  ? "cursor-pointer hover:ring-4 hover:ring-primary/20 hover:scale-105"
+                  : ""
+              }`}
+              onClick={() => {
+                if (isEditing && !isSaving) {
+                  document.getElementById("avatar-input")?.click();
+                }
+              }}
+            >
               <AvatarImage
                 src={avatar || user.avatar || undefined}
                 alt={user.name}
@@ -242,12 +280,15 @@ export function ProfileEditor({ user, tierInfo }: ProfileEditorProps) {
                 {getInitials(name || user.name)}
               </AvatarFallback>
             </Avatar>
+
+            {/* Camera icon (edit mode only) */}
             {isEditing && (
               <div className="absolute -bottom-1 -right-1 rounded-full bg-primary p-1.5 text-primary-foreground">
                 <Camera className="h-3 w-3" />
               </div>
             )}
           </div>
+
           <div>
             {isEditing ? (
               <Input
@@ -352,25 +393,6 @@ export function ProfileEditor({ user, tierInfo }: ProfileEditorProps) {
         </div>
       </div>
 
-      {/* Avatar URL Field - only shown when editing */}
-      {isEditing && (
-        <div className="space-y-2">
-          <Label className="text-sm font-medium text-muted-foreground">
-            Avatar URL
-          </Label>
-          <Input
-            value={avatar}
-            onChange={(e) => setAvatar(e.target.value)}
-            placeholder="https://example.com/your-avatar.jpg"
-            disabled={isSaving}
-          />
-          <p className="text-xs text-muted-foreground">
-            Enter a URL to an image for your profile picture. Leave empty to use
-            initials.
-          </p>
-        </div>
-      )}
-
       {/* Coin Balance & Upgrade Section */}
       <div className="space-y-4">
         <div className="flex items-center justify-between">
@@ -441,49 +463,55 @@ export function ProfileEditor({ user, tierInfo }: ProfileEditorProps) {
           </div>
         )}
 
-        {/* Progress to LEGEND - always show unless already LEGEND */}
+        {/* Progress to next tier - always show unless already LEGEND, matches dashboard logic */}
         {user.tier !== "LEGEND" && (
           <div className="space-y-2">
             <div className="flex items-center justify-between text-sm">
               <span className="text-muted-foreground flex items-center gap-1">
                 <Crown className="h-4 w-4 text-amber-500" />
-                Progress to LEGEND
+                Progress to {tierInfo.nextTier}
               </span>
               <span className="font-medium">
-                {user.coins} / {PLAN_PRICES.LEGEND} coins
+                {user.coins} /{" "}
+                {tierInfo.nextTier
+                  ? TIER_THRESHOLDS[tierInfo.nextTier].min
+                  : "-"}{" "}
+                coins
               </span>
             </div>
             <div className="h-2 w-full rounded-full bg-secondary">
               <div
-                className="h-2 rounded-full bg-linear-to-r from-blue-500 via-purple-500 to-amber-500 transition-all duration-500"
+                className="h-2 rounded-full bg-primary transition-all duration-500"
                 style={{
-                  width: `${Math.min(100, (user.coins / PLAN_PRICES.LEGEND) * 100)}%`,
+                  width: `${tierInfo.progressPercent}%`,
                 }}
               />
             </div>
             <div className="flex items-center justify-between text-xs text-muted-foreground">
               <span>
-                {user.coins >= PLAN_PRICES.LEGEND
-                  ? "You can afford LEGEND!"
-                  : `${PLAN_PRICES.LEGEND - user.coins} more coins needed`}
+                {tierInfo.nextTier
+                  ? `${tierInfo.coinsToNext} coins to ${tierInfo.nextTier}`
+                  : "Max tier achieved!"}
               </span>
               <div className="flex items-center gap-4">
-                {user.coins < PLAN_PRICES.PRO && (
+                {tierInfo.nextTier === "PRO" && (
                   <span className="flex items-center gap-1">
                     <Zap className="h-3 w-3 text-blue-500" />
-                    PRO: {PLAN_PRICES.PRO}
+                    PRO: {TIER_THRESHOLDS.PRO.min}
                   </span>
                 )}
-                {user.coins < PLAN_PRICES.ELITE && (
+                {tierInfo.nextTier === "ELITE" && (
                   <span className="flex items-center gap-1">
                     <Sparkles className="h-3 w-3 text-purple-500" />
-                    ELITE: {PLAN_PRICES.ELITE}
+                    ELITE: {TIER_THRESHOLDS.ELITE.min}
                   </span>
                 )}
-                <span className="flex items-center gap-1">
-                  <Crown className="h-3 w-3 text-amber-500" />
-                  LEGEND: {PLAN_PRICES.LEGEND}
-                </span>
+                {tierInfo.nextTier === "LEGEND" && (
+                  <span className="flex items-center gap-1">
+                    <Crown className="h-3 w-3 text-amber-500" />
+                    LEGEND: {TIER_THRESHOLDS.LEGEND.min}
+                  </span>
+                )}
               </div>
             </div>
           </div>

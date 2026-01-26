@@ -1,6 +1,6 @@
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
-import { getNextTierInfo, type Tier } from "@/lib/coins";
+import { type Tier } from "@/lib/coins";
 import Link from "next/link";
 import {
   Card,
@@ -21,9 +21,9 @@ import {
   Circle,
   Clock,
   CheckCircle2,
-  Flag,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { getProgressFromSubscriptionTier } from "@/lib/coins";
 
 const tierColors: Record<Tier, { bg: string; text: string; border: string }> = {
   FREE: { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-300" },
@@ -101,9 +101,11 @@ export default async function DashboardPage() {
     take: 5,
   });
 
-  const tierInfo = getNextTierInfo(user?.coins ?? 0);
-  const currentTier = (user?.tier as Tier) || "FREE";
-  const tierStyle = tierColors[currentTier];
+  const coins = user?.coins ?? 0;
+
+  const subscriptionTier = user?.tier as Tier;
+  const { progressPercent, coinsToNext, nextTier } =
+    getProgressFromSubscriptionTier(coins, subscriptionTier);
 
   return (
     <div className="space-y-6">
@@ -125,7 +127,7 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <div className="text-2xl font-bold">{user?.coins ?? 0}</div>
-            <p className="text-xs text-muted-foreground">Total coins earned</p>
+            <p className="text-xs text-muted-foreground">Coins available</p>
           </CardContent>
         </Card>
 
@@ -137,15 +139,21 @@ export default async function DashboardPage() {
           <CardContent>
             <div className="flex items-center gap-2">
               <span
-                className={`inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${tierStyle.bg} ${tierStyle.text} border ${tierStyle.border}`}
+                className={cn(
+                  "inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold",
+                  tierColors[subscriptionTier].bg,
+                  tierColors[subscriptionTier].text,
+                  "border",
+                  tierColors[subscriptionTier].border,
+                )}
               >
-                {currentTier}
+                {subscriptionTier}
               </span>
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {currentTier === "LEGEND"
-                ? "Maximum tier reached!"
-                : `Next: ${tierInfo.nextTier}`}
+              {subscriptionTier === "LEGEND"
+                ? "You are on the highest plan"
+                : `Next plan: ${nextTier}`}
             </p>
           </CardContent>
         </Card>
@@ -156,18 +164,16 @@ export default async function DashboardPage() {
             <TrendingUp className="h-4 w-4 text-muted-foreground" />
           </CardHeader>
           <CardContent>
-            <div className="text-2xl font-bold">
-              {tierInfo.progressPercent}%
-            </div>
+            <div className="text-2xl font-bold">{progressPercent}%</div>
             <div className="mt-2 h-2 w-full rounded-full bg-secondary">
               <div
                 className="h-2 rounded-full bg-primary transition-all duration-500"
-                style={{ width: `${tierInfo.progressPercent}%` } as React.CSSProperties}
+                style={{ width: `${progressPercent}%` } as React.CSSProperties}
               />
             </div>
             <p className="text-xs text-muted-foreground mt-1">
-              {tierInfo.nextTier
-                ? `${tierInfo.coinsToNext} coins to ${tierInfo.nextTier}`
+              {nextTier
+                ? `${coinsToNext} coins to ${nextTier}`
                 : "Max tier achieved!"}
             </p>
           </CardContent>
@@ -223,10 +229,12 @@ export default async function DashboardPage() {
           </CardHeader>
           <CardContent>
             <p className="text-sm text-muted-foreground">
-              {currentTier === "FREE" && "Basic features included"}
-              {currentTier === "PRO" && "Priority support + advanced features"}
-              {currentTier === "ELITE" && "All Pro benefits + exclusive tools"}
-              {currentTier === "LEGEND" && "Full access to all features"}
+              {subscriptionTier === "FREE" && "Basic features included"}
+              {subscriptionTier === "PRO" &&
+                "Priority support + advanced features"}
+              {subscriptionTier === "ELITE" &&
+                "All Pro benefits + exclusive tools"}
+              {subscriptionTier === "LEGEND" && "Full access to all features"}
             </p>
           </CardContent>
         </Card>
@@ -324,7 +332,9 @@ export default async function DashboardPage() {
                                   ? "bg-amber-500"
                                   : "bg-muted-foreground/20",
                           )}
-                          style={{ width: `${progress}%` } as React.CSSProperties}
+                          style={
+                            { width: `${progress}%` } as React.CSSProperties
+                          }
                         />
                       </div>
                       <span className="text-[10px] text-muted-foreground">

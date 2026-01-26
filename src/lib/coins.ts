@@ -1,14 +1,21 @@
 import { prisma } from "@/lib/prisma";
 
 // Tier thresholds
-const TIER_THRESHOLDS = {
-  FREE: { min: 0, max: 499 },
-  PRO: { min: 500, max: 1499 },
-  ELITE: { min: 1500, max: 2999 },
-  LEGEND: { min: 3000, max: Infinity },
+export const TIER_THRESHOLDS = {
+  FREE: { min: 0, max: 399 },
+  PRO: { min: 400, max: 999 },
+  ELITE: { min: 1000, max: 1999 },
+  LEGEND: { min: 2000, max: Infinity },
 } as const;
 
 export type Tier = keyof typeof TIER_THRESHOLDS;
+
+export const TIER_UPGRADE_COST: Record<Tier, number | null> = {
+  FREE: 399,
+  PRO: 999,
+  ELITE: 1999,
+  LEGEND: null,
+};
 
 /**
  * Calculate the tier based on coin balance
@@ -58,6 +65,79 @@ export function getNextTierInfo(coins: number): {
     currentTier,
     nextTier,
     coinsToNext: nextMin - coins,
+    progressPercent,
+  };
+}
+
+/**
+ * Get progress relative to the user's SUBSCRIPTION tier
+ * (used for dashboard/profile progress bar)
+ */
+// export function getProgressFromSubscriptionTier(
+//   coins: number,
+//   subscriptionTier: Tier,
+// ) {
+//   const tierOrder: Tier[] = ["FREE", "PRO", "ELITE", "LEGEND"];
+//   const currentIndex = tierOrder.indexOf(subscriptionTier);
+
+//   // LEGEND has no next tier
+//   if (subscriptionTier === "LEGEND") {
+//     return {
+//       progressPercent: 100,
+//       coinsToNext: 0,
+//       nextTier: null,
+//     };
+//   }
+
+//   const nextTier = tierOrder[currentIndex + 1];
+
+//   const currentMin = TIER_THRESHOLDS[subscriptionTier].min;
+//   const nextMin = TIER_THRESHOLDS[nextTier].min;
+
+//   const clampedCoins = Math.max(coins, currentMin);
+//   const coinsInTier = clampedCoins - currentMin;
+//   const coinsNeeded = nextMin - currentMin;
+
+//   const progressPercent = Math.min(
+//     100,
+//     Math.round((coinsInTier / coinsNeeded) * 100),
+//   );
+
+//   return {
+//     progressPercent,
+//     coinsToNext: Math.max(0, nextMin - clampedCoins),
+//     nextTier,
+//   };
+// }
+
+export function getProgressFromSubscriptionTier(
+  coins: number,
+  subscriptionTier: Tier,
+): {
+  nextTier: Tier | null;
+  coinsToNext: number;
+  progressPercent: number;
+} {
+  if (subscriptionTier === "LEGEND") {
+    return {
+      nextTier: null,
+      coinsToNext: 0,
+      progressPercent: 100,
+    };
+  }
+
+  const tierOrder: Tier[] = ["FREE", "PRO", "ELITE", "LEGEND"];
+  const nextTier = tierOrder[tierOrder.indexOf(subscriptionTier) + 1];
+  const upgradeCost = TIER_UPGRADE_COST[subscriptionTier]!;
+
+  const progressPercent = Math.min(
+    100,
+    Math.floor((coins / upgradeCost) * 100),
+  );
+
+  return {
+    nextTier,
+    coinsToNext: Math.max(0, upgradeCost - coins),
     progressPercent,
   };
 }
