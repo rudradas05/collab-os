@@ -139,10 +139,11 @@ export function ProfileEditor({ user, tierInfo }: ProfileEditorProps) {
           window.location.reload();
         }, 1500);
       } else if (data.url) {
-        router.push(data.url);
+        // Stripe checkout URL - show coins message instead
+        setError("Card payments coming soon! Use your coins to upgrade.");
       }
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to upgrade");
+      setError("Card payments coming soon! Use your coins to upgrade.");
     } finally {
       setIsUpgrading(false);
     }

@@ -142,7 +142,15 @@ function BillingContent() {
       const result = await response.json();
 
       if (!response.ok) {
-        toast.error(result.error || "Failed to create subscription");
+        // Check if it's a Stripe-related error
+        if (
+          result.error?.includes("Stripe") ||
+          result.error?.includes("payment")
+        ) {
+          toast.error("Card payments coming soon! Use your coins to upgrade.");
+        } else {
+          toast.error(result.error || "Failed to create subscription");
+        }
         return;
       }
 
@@ -153,11 +161,13 @@ function BillingContent() {
       }
 
       if (result.url) {
-        window.location.href = result.url;
+        // Stripe checkout URL - show coins message instead
+        toast.error("Card payments coming soon! Use your coins to upgrade.");
+        return;
       }
     } catch (error) {
       console.error("Upgrade error:", error);
-      toast.error("Failed to process upgrade");
+      toast.error("Card payments coming soon! Use your coins to upgrade.");
     } finally {
       setUpgradingPlan(null);
     }
