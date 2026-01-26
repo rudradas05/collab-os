@@ -55,9 +55,17 @@ interface Workspace {
   createdAt: string;
 }
 
+interface User {
+  id: string;
+  name: string;
+  email: string;
+  role: "USER" | "OWNER" | "ADMIN";
+}
+
 export default function WorkspacesPage() {
   const router = useRouter();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
+  const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
   const [isDeleting, setIsDeleting] = useState(false);
@@ -68,9 +76,24 @@ export default function WorkspacesPage() {
   );
   const [workspaceName, setWorkspaceName] = useState("");
 
+  const canCreateWorkspace = user?.role === "OWNER" || user?.role === "ADMIN";
+
   useEffect(() => {
+    fetchUser();
     fetchWorkspaces();
   }, []);
+
+  const fetchUser = async () => {
+    try {
+      const response = await fetch("/api/auth/me");
+      if (response.ok) {
+        const data = await response.json();
+        setUser(data.user);
+      }
+    } catch {
+      // User fetch failed silently
+    }
+  };
 
   const fetchWorkspaces = async () => {
     try {
@@ -194,54 +217,56 @@ export default function WorkspacesPage() {
             Manage your workspaces and collaborate with your team
           </p>
         </div>
-        <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              Create Workspace
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <form onSubmit={handleCreateWorkspace}>
-              <DialogHeader>
-                <DialogTitle>Create Workspace</DialogTitle>
-                <DialogDescription>
-                  Create a new workspace to collaborate with your team
-                </DialogDescription>
-              </DialogHeader>
-              <div className="py-4">
-                <Label htmlFor="name" className="text-sm font-medium">
-                  Workspace Name
-                </Label>
-                <Input
-                  id="name"
-                  placeholder="My Workspace"
-                  value={workspaceName}
-                  onChange={(e) => setWorkspaceName(e.target.value)}
-                  className="mt-2"
-                  disabled={isCreating}
-                  autoFocus
-                />
-              </div>
-              <DialogFooter>
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setDialogOpen(false)}
-                  disabled={isCreating}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isCreating || !workspaceName.trim()}
-                >
-                  {isCreating ? "Creating..." : "Create"}
-                </Button>
-              </DialogFooter>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {canCreateWorkspace && (
+          <Dialog open={dialogOpen} onOpenChange={setDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                Create Workspace
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <form onSubmit={handleCreateWorkspace}>
+                <DialogHeader>
+                  <DialogTitle>Create Workspace</DialogTitle>
+                  <DialogDescription>
+                    Create a new workspace to collaborate with your team
+                  </DialogDescription>
+                </DialogHeader>
+                <div className="py-4">
+                  <Label htmlFor="name" className="text-sm font-medium">
+                    Workspace Name
+                  </Label>
+                  <Input
+                    id="name"
+                    placeholder="My Workspace"
+                    value={workspaceName}
+                    onChange={(e) => setWorkspaceName(e.target.value)}
+                    className="mt-2"
+                    disabled={isCreating}
+                    autoFocus
+                  />
+                </div>
+                <DialogFooter>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setDialogOpen(false)}
+                    disabled={isCreating}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isCreating || !workspaceName.trim()}
+                  >
+                    {isCreating ? "Creating..." : "Create"}
+                  </Button>
+                </DialogFooter>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {isLoading ? (
@@ -271,12 +296,16 @@ export default function WorkspacesPage() {
             No workspaces yet
           </h3>
           <p className="text-muted-foreground text-center max-w-sm mb-6">
-            Create your first workspace to start collaborating with your team
+            {canCreateWorkspace
+              ? "Create your first workspace to start collaborating with your team"
+              : "You don't have access to any workspaces yet. Ask an owner or admin to add you to a workspace."}
           </p>
-          <Button onClick={() => setDialogOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Create Workspace
-          </Button>
+          {canCreateWorkspace && (
+            <Button onClick={() => setDialogOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Create Workspace
+            </Button>
+          )}
         </motion.div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">

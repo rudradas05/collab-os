@@ -18,6 +18,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid token" }, { status: 401 });
     }
 
+    // Check if user has permission to create workspaces (OWNER or ADMIN only)
+    const user = await prisma.user.findUnique({
+      where: { id: payload.userId },
+      select: { role: true },
+    });
+
+    if (!user || user.role === Role.USER) {
+      return NextResponse.json(
+        { error: "Only workspace owners or admins can create workspaces" },
+        { status: 403 },
+      );
+    }
+
     const body = await request.json();
     const result = createWorkspaceSchema.safeParse(body);
 
@@ -48,19 +61,6 @@ export async function POST(request: NextRequest) {
           role: WorkspaceRole.OWNER,
         },
       });
-
-      // Update user role to OWNER if they are still a USER
-      const user = await tx.user.findUnique({
-        where: { id: payload.userId },
-        select: { role: true },
-      });
-
-      if (user && user.role === Role.USER) {
-        await tx.user.update({
-          where: { id: payload.userId },
-          data: { role: Role.OWNER },
-        });
-      }
 
       return newWorkspace;
     });

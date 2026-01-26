@@ -5,88 +5,54 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { Mail, Lock, ArrowRight, Sparkles } from "lucide-react";
+import { Mail, ArrowRight, ArrowLeft, KeyRound } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
-import { GoogleSignInButton } from "@/components/auth/google-sign-in-button";
 
-export default function SignInPage() {
+export default function ForgotPasswordPage() {
   const router = useRouter();
   const [isLoading, setIsLoading] = useState(false);
-  const [formData, setFormData] = useState({
-    email: "",
-    password: "",
-  });
+  const [email, setEmail] = useState("");
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
+    if (!email.trim()) return;
+
     setIsLoading(true);
-    const loadingToast = toast.loading("Signing in...");
+    const loadingToast = toast.loading("Sending OTP to your email...");
 
     try {
-      const response = await fetch("/api/auth/login", {
+      const response = await fetch("/api/auth/forgot-password", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(formData),
+        body: JSON.stringify({ email: email.trim().toLowerCase() }),
       });
 
       const data = await response.json();
 
       if (!response.ok) {
         toast.dismiss(loadingToast);
-        toast.error("Sign in failed", {
-          description: data.error || "Invalid email or password.",
-        });
-        return;
-      }
-
-      toast.dismiss(loadingToast);
-      toast.success("Welcome back!", {
-        description: "You have successfully signed in.",
-      });
-      router.push("/dashboard");
-      router.refresh();
-    } catch {
-      toast.dismiss(loadingToast);
-      toast.error("Something went wrong", {
-        description: "Please try again later.",
-      });
-    } finally {
-      setIsLoading(false);
-    }
-  };
-
-  const handleGoogleSuccess = async (credential: string) => {
-    setIsLoading(true);
-    const loadingToast = toast.loading("Signing in with Google...");
-
-    try {
-      const response = await fetch("/api/auth/google", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ credential }),
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        toast.dismiss(loadingToast);
-        toast.error("Google sign-in failed", {
+        toast.error("Failed to send OTP", {
           description: data.error || "Please try again.",
         });
         return;
       }
 
       toast.dismiss(loadingToast);
-      toast.success("Welcome back!", {
-        description: "You have successfully signed in with Google.",
+      toast.success("OTP sent!", {
+        description: "Please check your email for the verification code.",
       });
-      router.push("/dashboard");
-      router.refresh();
+
+      // Redirect to reset password page with token
+      if (data.token) {
+        router.push(
+          `/reset-password?token=${data.token}&email=${encodeURIComponent(email)}`,
+        );
+      }
     } catch {
       toast.dismiss(loadingToast);
-      toast.error("Google sign-in failed", {
+      toast.error("Something went wrong", {
         description: "Please try again later.",
       });
     } finally {
@@ -118,14 +84,15 @@ export default function SignInPage() {
             </motion.div>
           </Link>
           <h1 className="text-4xl font-bold text-foreground mb-4">
-            Welcome back to your workspace
+            Reset your password
           </h1>
           <p className="text-lg text-muted-foreground mb-8">
-            Continue where you left off. Your team is waiting for you.
+            Don&apos;t worry, it happens to the best of us. We&apos;ll send you
+            a verification code to reset your password.
           </p>
           <div className="flex items-center gap-2 text-sm text-muted-foreground">
-            <Sparkles className="h-4 w-4 text-primary" />
-            <span>Trusted by thousands of teams worldwide</span>
+            <KeyRound className="h-4 w-4 text-primary" />
+            <span>Secure password reset process</span>
           </div>
         </motion.div>
       </div>
@@ -158,7 +125,7 @@ export default function SignInPage() {
               transition={{ delay: 0.1 }}
               className="text-3xl font-bold text-foreground mb-2"
             >
-              Sign in
+              Forgot password?
             </motion.h2>
             <motion.p
               initial={{ opacity: 0 }}
@@ -166,7 +133,7 @@ export default function SignInPage() {
               transition={{ delay: 0.2 }}
               className="text-muted-foreground"
             >
-              Enter your credentials to access your account
+              Enter your email and we&apos;ll send you a verification code
             </motion.p>
           </div>
 
@@ -186,10 +153,8 @@ export default function SignInPage() {
                   id="email"
                   type="email"
                   placeholder="you@example.com"
-                  value={formData.email}
-                  onChange={(e) =>
-                    setFormData({ ...formData, email: e.target.value })
-                  }
+                  value={email}
+                  onChange={(e) => setEmail(e.target.value)}
                   required
                   disabled={isLoading}
                   className="pl-10 h-12 bg-white border-2 transition-all duration-200 focus:border-primary focus:ring-4 focus:ring-primary/10 hover:border-primary/50"
@@ -201,45 +166,11 @@ export default function SignInPage() {
               initial={{ opacity: 0, y: 10 }}
               animate={{ opacity: 1, y: 0 }}
               transition={{ delay: 0.4 }}
-              className="space-y-2"
-            >
-              <div className="flex items-center justify-between">
-                <Label htmlFor="password" className="text-sm font-medium">
-                  Password
-                </Label>
-                <Link
-                  href="/forgot-password"
-                  className="text-xs text-primary hover:text-primary/80 transition-colors hover:underline underline-offset-4"
-                >
-                  Forgot password?
-                </Link>
-              </div>
-              <div className="relative group">
-                <Lock className="absolute left-3.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground transition-colors group-focus-within:text-primary" />
-                <Input
-                  id="password"
-                  type="password"
-                  placeholder="••••••••"
-                  value={formData.password}
-                  onChange={(e) =>
-                    setFormData({ ...formData, password: e.target.value })
-                  }
-                  required
-                  disabled={isLoading}
-                  className="pl-10 h-12 bg-white border-2 transition-all duration-200 focus:border-primary focus:ring-4 focus:ring-primary/10 hover:border-primary/50"
-                />
-              </div>
-            </motion.div>
-
-            <motion.div
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: 0.5 }}
             >
               <Button
                 type="submit"
                 className="w-full h-12 text-base font-medium"
-                disabled={isLoading}
+                disabled={isLoading || !email.trim()}
               >
                 {isLoading ? (
                   <span className="flex items-center gap-2">
@@ -252,11 +183,11 @@ export default function SignInPage() {
                       }}
                       className="h-4 w-4 border-2 border-white/30 border-t-white rounded-full"
                     />
-                    Signing in...
+                    Sending OTP...
                   </span>
                 ) : (
                   <span className="flex items-center gap-2">
-                    Sign in
+                    Send OTP
                     <ArrowRight className="h-4 w-4" />
                   </span>
                 )}
@@ -267,44 +198,17 @@ export default function SignInPage() {
           <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
-            transition={{ delay: 0.6 }}
-            className="relative my-8"
+            transition={{ delay: 0.5 }}
+            className="mt-8"
           >
-            <div className="absolute inset-0 flex items-center">
-              <span className="w-full border-t-2" />
-            </div>
-            <div className="relative flex justify-center text-xs uppercase">
-              <span className="bg-linear-to-br from-white via-blue-50/30 to-white px-4 text-muted-foreground font-medium">
-                Or continue with
-              </span>
-            </div>
-          </motion.div>
-
-          <motion.div
-            initial={{ opacity: 0, y: 10 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.7 }}
-          >
-            <GoogleSignInButton
-              onSuccess={handleGoogleSuccess}
-              text="signin_with"
-            />
-          </motion.div>
-
-          <motion.p
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            transition={{ delay: 0.8 }}
-            className="mt-8 text-center text-sm text-muted-foreground"
-          >
-            Don&apos;t have an account?{" "}
             <Link
-              href="/sign-up"
-              className="font-semibold text-primary hover:text-primary/80 transition-colors hover:underline underline-offset-4"
+              href="/sign-in"
+              className="inline-flex items-center gap-2 text-sm text-muted-foreground hover:text-primary transition-colors"
             >
-              Create one now
+              <ArrowLeft className="h-4 w-4" />
+              Back to sign in
             </Link>
-          </motion.p>
+          </motion.div>
         </motion.div>
       </div>
     </div>

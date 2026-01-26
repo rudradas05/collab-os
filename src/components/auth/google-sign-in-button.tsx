@@ -104,7 +104,7 @@ export function GoogleSignInButton({
         onLoad={handleGoogleLoad}
         strategy="afterInteractive"
       />
-      <div className="flex justify-center min-h-[44px] items-center">
+      <div className="flex justify-center min-h-11 items-center">
         <div ref={buttonRef} />
         {!isLoaded && (
           <motion.div
