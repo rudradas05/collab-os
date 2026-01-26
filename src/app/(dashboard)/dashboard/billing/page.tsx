@@ -178,6 +178,10 @@ function BillingContent() {
   const currentPlan = (data?.subscription?.plan as Plan) || "FREE";
   const coins = data?.coins ?? 0;
 
+  // Plan order for comparison
+  const PLAN_ORDER: Plan[] = ["FREE", "PRO", "ELITE", "LEGEND"];
+  const currentPlanIndex = PLAN_ORDER.indexOf(currentPlan);
+
   if (isLoading) {
     return (
       <div className="flex h-64 items-center justify-center">
@@ -272,6 +276,9 @@ function BillingContent() {
             const details = PLAN_DETAILS[plan];
             const Icon = details.icon;
             const isCurrentPlan = currentPlan === plan;
+            const planIndex = PLAN_ORDER.indexOf(plan);
+            // Prevent downgrade: only allow upgrade to higher plan
+            const isDowngrade = planIndex < currentPlanIndex;
             const coinValueInPaisa = coins * 100; // 1 coin = 100 paisa (₹1)
             const priceAfterDiscount = Math.max(
               0,
@@ -288,11 +295,16 @@ function BillingContent() {
               >
                 <Card
                   className={cn(
-                    "relative transition-all duration-300 hover:shadow-lg hover:-translate-y-1",
+                    "relative transition-all duration-300",
+                    !isDowngrade && "hover:shadow-lg hover:-translate-y-1",
+                    isDowngrade && "cursor-not-allowed opacity-60",
                     isCurrentPlan && "border-primary shadow-lg",
                     plan === "ELITE" && "border-purple-500/50",
                   )}
                 >
+                  {isDowngrade && (
+                    <div className="absolute  flex flex-col items-center justify-center  pointer-events-none rounded-lg"></div>
+                  )}
                   {plan === "ELITE" && (
                     <div className="absolute -top-3 left-1/2 -translate-x-1/2">
                       <span className="bg-purple-500 text-white text-xs font-semibold px-3 py-1 rounded-full">
@@ -350,10 +362,14 @@ function BillingContent() {
                     <Button
                       className="w-full"
                       variant={isCurrentPlan ? "outline" : "default"}
-                      disabled={isCurrentPlan || upgradingPlan !== null}
+                      disabled={
+                        isCurrentPlan || upgradingPlan !== null || isDowngrade
+                      }
                       onClick={() => handleUpgrade(plan)}
                     >
-                      {upgradingPlan === plan ? (
+                      {isDowngrade ? (
+                        "You already have a higher plan!"
+                      ) : upgradingPlan === plan ? (
                         <>
                           <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                           Processing...
