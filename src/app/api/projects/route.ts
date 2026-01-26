@@ -1,39 +1,40 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { createNotification } from "@/lib/notifications";
+import { notifyWorkspaceMembers } from "@/lib/automations";
+import { createProjectSchema } from "@/lib/validations";
+import {
+  requireWorkspaceMember,
+  requireWorkspaceAdminOrOwner,
+} from "@/lib/workspace";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  getClientIdentifier,
+  RATE_LIMITS,
+} from "@/lib/rate-limit";
+import { ApiErrors, handleZodError } from "@/lib/api-errors";
 
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return ApiErrors.unauthorized();
     }
 
     const { searchParams } = new URL(request.url);
     const workspaceId = searchParams.get("workspaceId");
 
     if (!workspaceId) {
-      return NextResponse.json(
-        { error: "workspaceId is required" },
-        { status: 400 },
-      );
+      return ApiErrors.badRequest("workspaceId is required");
     }
 
-    // Verify user is member of workspace
-    const membership = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: {
-          userId: user.id,
-          workspaceId,
-        },
-      },
-    });
+    // Verify user is member of workspace (any role can view projects)
+    const permission = await requireWorkspaceMember(workspaceId, user.id);
 
-    if (!membership) {
-      return NextResponse.json(
-        { error: "You are not a member of this workspace" },
-        { status: 403 },
-      );
+    if (!permission.allowed) {
+      return ApiErrors.forbidden("You are not a member of this workspace");
     }
 
     const projects = await prisma.project.findMany({
@@ -49,51 +50,42 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ projects });
   } catch (error) {
     console.error("Get projects error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch projects" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError("Failed to fetch projects");
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting for project creation
+    const clientId = getClientIdentifier(request);
+    const rateLimitResult = checkRateLimit(
+      `projects:create:${clientId}`,
+      RATE_LIMITS.GENERAL,
+    );
+    if (!rateLimitResult.success) {
+      return rateLimitResponse(rateLimitResult);
+    }
+
     const user = await getCurrentUser(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return ApiErrors.unauthorized();
     }
 
     const body = await request.json();
-    const { name, description, workspaceId } = body;
+    const parseResult = createProjectSchema.safeParse(body);
 
-    if (!name || typeof name !== "string" || !name.trim()) {
-      return NextResponse.json(
-        { error: "Project name is required" },
-        { status: 400 },
-      );
+    if (!parseResult.success) {
+      return handleZodError(parseResult.error);
     }
 
-    if (!workspaceId) {
-      return NextResponse.json(
-        { error: "workspaceId is required" },
-        { status: 400 },
-      );
-    }
+    const { name, description, workspaceId } = parseResult.data;
 
-    // Verify user is member of workspace
-    const membership = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: {
-          userId: user.id,
-          workspaceId,
-        },
-      },
-    });
+    // Only OWNER or ADMIN can create projects
+    const permission = await requireWorkspaceAdminOrOwner(workspaceId, user.id);
 
-    if (!membership) {
-      return NextResponse.json(
-        { error: "You are not a member of this workspace" },
-        { status: 403 },
+    if (!permission.allowed) {
+      return ApiErrors.forbidden(
+        "Only workspace owners or admins can create projects",
       );
     }
 
@@ -110,12 +102,26 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    // Create notification for project creation
+    await createNotification({
+      userId: user.id,
+      title: "Project Created",
+      message: `Your project "${project.name}" has been created successfully.`,
+      type: "SUCCESS",
+    });
+
+    // Notify workspace members if PROJECT_CREATED automation is enabled
+    await notifyWorkspaceMembers(
+      workspaceId,
+      "PROJECT_CREATED",
+      "New Project Created",
+      `${user.name || user.email} created project "${project.name}"`,
+      user.id, // Exclude the creator
+    );
+
     return NextResponse.json({ project }, { status: 201 });
   } catch (error) {
     console.error("Create project error:", error);
-    return NextResponse.json(
-      { error: "Failed to create project" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError("Failed to create project");
   }
 }

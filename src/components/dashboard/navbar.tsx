@@ -1,7 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useRouter, usePathname } from "next/navigation";
-import { LogOut, User, ChevronRight } from "lucide-react";
+import Link from "next/link";
+import { LogOut, User, ChevronRight, Bell } from "lucide-react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -23,6 +25,7 @@ import {
 } from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { MobileSidebar } from "@/components/dashboard/sidebar";
+import { GlobalSearch } from "@/components/dashboard/global-search";
 import { Role } from "@/generated/prisma";
 
 interface NavbarProps {
@@ -75,16 +78,36 @@ export function Navbar({ user }: NavbarProps) {
       .slice(0, 2);
   };
 
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const response = await fetch("/api/notifications?limit=1");
+        const data = await response.json();
+        if (response.ok) {
+          setUnreadCount(data.unreadCount || 0);
+        }
+      } catch (error) {
+        console.error("Failed to fetch notification count:", error);
+      }
+    };
+
+    fetchUnreadCount();
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <motion.header
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="flex h-14 items-center justify-between border-b bg-background px-4"
+      className="flex h-14 items-center justify-between border-b bg-background px-4 gap-4"
     >
       <div className="flex items-center gap-4">
         <MobileSidebar />
-        <Breadcrumb>
+        <Breadcrumb className="hidden md:flex">
           <BreadcrumbList>
             <BreadcrumbItem>
               {isSubPage ? (
@@ -107,7 +130,22 @@ export function Navbar({ user }: NavbarProps) {
         </Breadcrumb>
       </div>
 
+      {/* Global Search */}
+      <div className="flex-1 max-w-md hidden sm:block">
+        <GlobalSearch />
+      </div>
+
       <div className="flex items-center gap-3">
+        <Link href="/dashboard/notifications">
+          <Button variant="ghost" size="icon" className="relative">
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </Button>
+        </Link>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <motion.button

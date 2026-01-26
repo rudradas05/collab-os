@@ -1,8 +1,9 @@
 "use client";
 
+import { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { LogOut, User, Crown, Users, ArrowLeft } from "lucide-react";
+import { LogOut, User, Crown, Users, ArrowLeft, Bell } from "lucide-react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
@@ -16,6 +17,7 @@ import {
   DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { MobileWorkspaceSidebar } from "@/components/workspace/sidebar";
+import { GlobalSearch } from "@/components/dashboard/global-search";
 import { Role, WorkspaceRole } from "@/generated/prisma";
 
 interface WorkspaceNavbarProps {
@@ -66,12 +68,33 @@ export function WorkspaceNavbar({
       .slice(0, 2);
   };
 
+  const [unreadCount, setUnreadCount] = useState(0);
+
+  useEffect(() => {
+    const fetchUnreadCount = async () => {
+      try {
+        const response = await fetch("/api/notifications?limit=1");
+        const data = await response.json();
+        if (response.ok) {
+          setUnreadCount(data.unreadCount || 0);
+        }
+      } catch (error) {
+        console.error("Failed to fetch notification count:", error);
+      }
+    };
+
+    fetchUnreadCount();
+    // Refresh every 30 seconds
+    const interval = setInterval(fetchUnreadCount, 30000);
+    return () => clearInterval(interval);
+  }, []);
+
   return (
     <motion.header
       initial={{ opacity: 0, y: -10 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.3 }}
-      className="flex h-14 items-center justify-between border-b bg-background px-4"
+      className="flex h-14 items-center justify-between border-b bg-background px-4 gap-4"
     >
       <div className="flex items-center gap-4">
         <MobileWorkspaceSidebar
@@ -84,26 +107,24 @@ export function WorkspaceNavbar({
             Back
           </Button>
         </Link>
-        <div className="flex items-center gap-2">
-          <h1 className="font-semibold text-foreground">{workspace.name}</h1>
-          <div
-            className={`flex items-center gap-1 text-xs px-2 py-0.5 rounded-full ${
-              workspaceRole === "OWNER"
-                ? "text-amber-600 bg-amber-50"
-                : "text-blue-600 bg-blue-50"
-            }`}
-          >
-            {workspaceRole === "OWNER" ? (
-              <Crown className="h-3 w-3" />
-            ) : (
-              <Users className="h-3 w-3" />
-            )}
-            {workspaceRole === "OWNER" ? "Owner" : "Member"}
-          </div>
-        </div>
+      </div>
+
+      {/* Global Search */}
+      <div className="flex-1 max-w-md hidden sm:block">
+        <GlobalSearch />
       </div>
 
       <div className="flex items-center gap-3">
+        <Link href="/dashboard/notifications">
+          <Button variant="ghost" size="icon" className="relative">
+            <Bell className="h-5 w-5" />
+            {unreadCount > 0 && (
+              <span className="absolute -top-1 -right-1 flex h-5 w-5 items-center justify-center rounded-full bg-destructive text-[10px] font-medium text-destructive-foreground">
+                {unreadCount > 99 ? "99+" : unreadCount}
+              </span>
+            )}
+          </Button>
+        </Link>
         <DropdownMenu>
           <DropdownMenuTrigger asChild>
             <motion.button

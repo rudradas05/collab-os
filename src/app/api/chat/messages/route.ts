@@ -1,22 +1,27 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { chatMessageSchema } from "@/lib/validations";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  getClientIdentifier,
+  RATE_LIMITS,
+} from "@/lib/rate-limit";
+import { ApiErrors, handleZodError } from "@/lib/api-errors";
 
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return ApiErrors.unauthorized();
     }
 
     const { searchParams } = new URL(request.url);
     const workspaceId = searchParams.get("workspaceId");
 
     if (!workspaceId) {
-      return NextResponse.json(
-        { error: "Workspace ID is required" },
-        { status: 400 },
-      );
+      return ApiErrors.badRequest("Workspace ID is required");
     }
 
     // Verify user is member of workspace
@@ -30,10 +35,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!membership) {
-      return NextResponse.json(
-        { error: "You are not a member of this workspace" },
-        { status: 403 },
-      );
+      return ApiErrors.forbidden("You are not a member of this workspace");
     }
 
     // Get last 50 messages ordered by createdAt
@@ -77,36 +79,35 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ messages: messagesWithUsers });
   } catch (error) {
     console.error("Get chat messages error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch messages" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError("Failed to fetch messages");
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting for chat (general rate limit)
+    const clientId = getClientIdentifier(request);
+    const rateLimitResult = checkRateLimit(
+      `chat:messages:${clientId}`,
+      RATE_LIMITS.GENERAL,
+    );
+    if (!rateLimitResult.success) {
+      return rateLimitResponse(rateLimitResult);
+    }
+
     const user = await getCurrentUser(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return ApiErrors.unauthorized();
     }
 
     const body = await request.json();
-    const { workspaceId, content } = body;
+    const parseResult = chatMessageSchema.safeParse(body);
 
-    if (!workspaceId || typeof workspaceId !== "string") {
-      return NextResponse.json(
-        { error: "Workspace ID is required" },
-        { status: 400 },
-      );
+    if (!parseResult.success) {
+      return handleZodError(parseResult.error);
     }
 
-    if (!content || typeof content !== "string" || !content.trim()) {
-      return NextResponse.json(
-        { error: "Message content is required" },
-        { status: 400 },
-      );
-    }
+    const { workspaceId, content } = parseResult.data;
 
     // Verify user is member of workspace
     const membership = await prisma.workspaceMember.findUnique({
@@ -119,10 +120,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!membership) {
-      return NextResponse.json(
-        { error: "You are not a member of this workspace" },
-        { status: 403 },
-      );
+      return ApiErrors.forbidden("You are not a member of this workspace");
     }
 
     // Get full user data
@@ -152,9 +150,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Create chat message error:", error);
-    return NextResponse.json(
-      { error: "Failed to send message" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError("Failed to send message");
   }
 }

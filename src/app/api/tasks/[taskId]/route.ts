@@ -2,6 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { addCoins } from "@/lib/coins";
+import { createNotification } from "@/lib/notifications";
+import { notifyWorkspaceMembers } from "@/lib/automations";
+import { updateTaskSchema } from "@/lib/validations";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  getClientIdentifier,
+  RATE_LIMITS,
+} from "@/lib/rate-limit";
+import { ApiErrors, handleZodError } from "@/lib/api-errors";
 
 const COIN_REWARD = 10;
 
@@ -10,14 +20,30 @@ export async function PATCH(
   { params }: { params: Promise<{ taskId: string }> },
 ) {
   try {
+    // Rate limiting
+    const clientId = getClientIdentifier(request);
+    const rateLimitResult = checkRateLimit(
+      `tasks:update:${clientId}`,
+      RATE_LIMITS.GENERAL,
+    );
+    if (!rateLimitResult.success) {
+      return rateLimitResponse(rateLimitResult);
+    }
+
     const user = await getCurrentUser(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return ApiErrors.unauthorized();
     }
 
     const { taskId } = await params;
     const body = await request.json();
-    const { status, title, assignedTo } = body;
+    const parseResult = updateTaskSchema.safeParse(body);
+
+    if (!parseResult.success) {
+      return handleZodError(parseResult.error);
+    }
+
+    const { status, title, assignedTo, priority, dueDate } = parseResult.data;
 
     // Get task with project to verify access
     const existingTask = await prisma.task.findUnique({
@@ -28,7 +54,7 @@ export async function PATCH(
     });
 
     if (!existingTask) {
-      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+      return ApiErrors.notFound("Task");
     }
 
     // Verify user is member of workspace
@@ -42,10 +68,7 @@ export async function PATCH(
     });
 
     if (!membership) {
-      return NextResponse.json(
-        { error: "You are not a member of this workspace" },
-        { status: 403 },
-      );
+      return ApiErrors.forbidden("You are not a member of this workspace");
     }
 
     // Build update data
@@ -54,15 +77,11 @@ export async function PATCH(
       title?: string;
       assignedTo?: string | null;
       completedAt?: Date | null;
+      priority?: "LOW" | "MEDIUM" | "HIGH";
+      dueDate?: Date | null;
     } = {};
 
     if (title !== undefined) {
-      if (typeof title !== "string" || !title.trim()) {
-        return NextResponse.json(
-          { error: "Task title cannot be empty" },
-          { status: 400 },
-        );
-      }
       updateData.title = title.trim();
     }
 
@@ -78,13 +97,18 @@ export async function PATCH(
         });
 
         if (!assigneeMembership) {
-          return NextResponse.json(
-            { error: "Assignee must be a workspace member" },
-            { status: 400 },
-          );
+          return ApiErrors.badRequest("Assignee must be a workspace member");
         }
       }
       updateData.assignedTo = assignedTo || null;
+    }
+
+    if (priority !== undefined) {
+      updateData.priority = priority;
+    }
+
+    if (dueDate !== undefined) {
+      updateData.dueDate = dueDate ? new Date(dueDate) : null;
     }
 
     let coinAwarded = false;
@@ -92,9 +116,6 @@ export async function PATCH(
     let newTier: string | undefined;
 
     if (status !== undefined) {
-      if (!["TODO", "IN_PROGRESS", "DONE"].includes(status)) {
-        return NextResponse.json({ error: "Invalid status" }, { status: 400 });
-      }
       updateData.status = status;
 
       // Check if transitioning to DONE for the first time
@@ -114,6 +135,23 @@ export async function PATCH(
           coinsEarned = COIN_REWARD;
           newTier = coinResult.newTier;
         }
+
+        // Create notification for task completion
+        await createNotification({
+          userId: user.id,
+          title: "Task Completed",
+          message: `You completed "${existingTask.title}" and earned ${COIN_REWARD} coins!`,
+          type: "SUCCESS",
+        });
+
+        // Notify workspace members if TASK_DONE automation is enabled
+        await notifyWorkspaceMembers(
+          existingTask.project.workspaceId,
+          "TASK_DONE",
+          "Task Completed",
+          `${user.name || user.email} completed task "${existingTask.title}"`,
+          user.id, // Exclude the user who completed the task
+        );
       } else if (status !== "DONE" && existingTask.status === "DONE") {
         // Moving away from DONE - keep completedAt for history
       }
@@ -142,10 +180,7 @@ export async function PATCH(
     });
   } catch (error) {
     console.error("Update task error:", error);
-    return NextResponse.json(
-      { error: "Failed to update task" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError("Failed to update task");
   }
 }
 
@@ -156,7 +191,7 @@ export async function DELETE(
   try {
     const user = await getCurrentUser(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return ApiErrors.unauthorized();
     }
 
     const { taskId } = await params;
@@ -170,7 +205,7 @@ export async function DELETE(
     });
 
     if (!task) {
-      return NextResponse.json({ error: "Task not found" }, { status: 404 });
+      return ApiErrors.notFound("Task");
     }
 
     // Verify user is member of workspace
@@ -184,10 +219,7 @@ export async function DELETE(
     });
 
     if (!membership) {
-      return NextResponse.json(
-        { error: "You are not a member of this workspace" },
-        { status: 403 },
-      );
+      return ApiErrors.forbidden("You are not a member of this workspace");
     }
 
     await prisma.task.delete({
@@ -197,9 +229,6 @@ export async function DELETE(
     return NextResponse.json({ message: "Task deleted successfully" });
   } catch (error) {
     console.error("Delete task error:", error);
-    return NextResponse.json(
-      { error: "Failed to delete task" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError("Failed to delete task");
   }
 }

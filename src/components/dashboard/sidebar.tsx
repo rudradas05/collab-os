@@ -12,6 +12,10 @@ import {
   Building2,
   ChevronDown,
   ChevronRight,
+  CheckSquare,
+  Circle,
+  Clock,
+  CheckCircle2,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
@@ -26,6 +30,17 @@ import {
 interface Workspace {
   id: string;
   name: string;
+}
+
+interface Task {
+  id: string;
+  title: string;
+  status: "TODO" | "IN_PROGRESS" | "DONE";
+  projectId: string;
+  project?: {
+    name: string;
+    workspaceId: string;
+  };
 }
 
 const mainNavItems = [
@@ -63,6 +78,8 @@ function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
   const pathname = usePathname();
   const [workspaces, setWorkspaces] = useState<Workspace[]>([]);
   const [isWorkspacesExpanded, setIsWorkspacesExpanded] = useState(true);
+  const [myTasks, setMyTasks] = useState<Task[]>([]);
+  const [isMyTasksExpanded, setIsMyTasksExpanded] = useState(true);
 
   const fetchWorkspaces = useCallback(async () => {
     try {
@@ -70,6 +87,36 @@ function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
       const data = await response.json();
       if (response.ok) {
         setWorkspaces(data.workspaces || []);
+
+        // Fetch tasks for all workspaces
+        const allTasks: Task[] = [];
+        for (const workspace of data.workspaces || []) {
+          const projectsRes = await fetch(
+            `/api/projects?workspaceId=${workspace.id}`,
+          );
+          const projectsData = await projectsRes.json();
+
+          for (const project of projectsData.projects || []) {
+            const tasksRes = await fetch(`/api/tasks?projectId=${project.id}`);
+            const tasksData = await tasksRes.json();
+
+            // Filter for tasks assigned to current user (we'll fetch all and filter on client)
+            const projectTasks = (tasksData.tasks || []).map((t: Task) => ({
+              ...t,
+              project: {
+                name: project.name,
+                workspaceId: workspace.id,
+              },
+            }));
+            allTasks.push(...projectTasks);
+          }
+        }
+
+        // Sort by status (IN_PROGRESS first, then TODO, then DONE)
+        const statusOrder = { IN_PROGRESS: 0, TODO: 1, DONE: 2 };
+        allTasks.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+
+        setMyTasks(allTasks.slice(0, 5));
       }
     } catch (error) {
       console.error("Failed to fetch workspaces:", error);
@@ -184,6 +231,86 @@ function SidebarContent({ onItemClick }: { onItemClick?: () => void }) {
                       </div>
                     </Link>
                   )}
+                </motion.div>
+              )}
+            </AnimatePresence>
+          </div>
+        )}
+
+        {/* My Tasks Section */}
+        {myTasks.length > 0 && (
+          <div className="pt-4 mt-4 border-t">
+            <button
+              onClick={() => setIsMyTasksExpanded(!isMyTasksExpanded)}
+              className="flex items-center justify-between w-full px-3 py-2 text-xs font-semibold text-muted-foreground uppercase tracking-wider hover:text-foreground transition-colors"
+            >
+              <span className="flex items-center gap-2">
+                <CheckSquare className="h-3.5 w-3.5" />
+                My Tasks
+                <span className="text-[10px] bg-primary text-primary-foreground rounded-full px-1.5 py-0.5 font-medium">
+                  {myTasks.length}
+                </span>
+              </span>
+              {isMyTasksExpanded ? (
+                <ChevronDown className="h-3.5 w-3.5" />
+              ) : (
+                <ChevronRight className="h-3.5 w-3.5" />
+              )}
+            </button>
+            <AnimatePresence>
+              {isMyTasksExpanded && (
+                <motion.div
+                  initial={{ height: 0, opacity: 0 }}
+                  animate={{ height: "auto", opacity: 1 }}
+                  exit={{ height: 0, opacity: 0 }}
+                  transition={{ duration: 0.2 }}
+                  className="overflow-hidden space-y-1 mt-1"
+                >
+                  {myTasks.map((task) => (
+                    <Link
+                      key={task.id}
+                      href={`/workspace/${task.project?.workspaceId}/projects/${task.projectId}`}
+                      onClick={onItemClick}
+                    >
+                      <motion.div
+                        whileHover={{ x: 4 }}
+                        whileTap={{ scale: 0.98 }}
+                        className="flex items-start gap-2 rounded-lg px-3 py-1.5 text-sm transition-all duration-200 text-muted-foreground hover:bg-muted hover:text-foreground"
+                      >
+                        <div
+                          className={cn(
+                            "mt-0.5 shrink-0",
+                            task.status === "DONE" && "text-emerald-500",
+                            task.status === "IN_PROGRESS" && "text-amber-500",
+                            task.status === "TODO" && "text-slate-400",
+                          )}
+                        >
+                          {task.status === "DONE" && (
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          )}
+                          {task.status === "IN_PROGRESS" && (
+                            <Clock className="h-3.5 w-3.5" />
+                          )}
+                          {task.status === "TODO" && (
+                            <Circle className="h-3.5 w-3.5" />
+                          )}
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          <p
+                            className={cn(
+                              "truncate text-xs font-medium",
+                              task.status === "DONE" && "line-through",
+                            )}
+                          >
+                            {task.title}
+                          </p>
+                          <p className="text-[10px] text-muted-foreground/70 lowercase">
+                            {task.status.replace("_", " ")}
+                          </p>
+                        </div>
+                      </motion.div>
+                    </Link>
+                  ))}
                 </motion.div>
               )}
             </AnimatePresence>

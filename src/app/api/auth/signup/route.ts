@@ -2,17 +2,31 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { hashPassword, createToken, createAuthCookie } from "@/lib/auth";
 import { signupSchema } from "@/lib/validations";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+  getClientIdentifier,
+} from "@/lib/rate-limit";
+import { handleZodError, ApiErrors } from "@/lib/api-errors";
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting
+    const clientId = getClientIdentifier(request);
+    const rateLimitResult = checkRateLimit(
+      `auth:signup:${clientId}`,
+      RATE_LIMITS.AUTH,
+    );
+    if (!rateLimitResult.success) {
+      return rateLimitResponse(rateLimitResult);
+    }
+
     const body = await request.json();
     const result = signupSchema.safeParse(body);
 
     if (!result.success) {
-      return NextResponse.json(
-        { error: result.error.issues[0].message },
-        { status: 400 },
-      );
+      return handleZodError(result.error);
     }
 
     const { email, password, name } = result.data;
@@ -22,10 +36,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (existingUser) {
-      return NextResponse.json(
-        { error: "Email already registered" },
-        { status: 400 },
-      );
+      return ApiErrors.conflict("Email already registered");
     }
 
     const passwordHash = await hashPassword(password);
@@ -58,9 +69,6 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("Signup error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError();
   }
 }

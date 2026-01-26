@@ -10,13 +10,38 @@ const PUBLIC_ROUTES = [
 ];
 const AUTH_ROUTES = ["/sign-in", "/sign-up"];
 
+/**
+ * Security headers to be applied to all responses
+ */
+const SECURITY_HEADERS = {
+  "X-Content-Type-Options": "nosniff",
+  "X-Frame-Options": "DENY",
+  "X-XSS-Protection": "1; mode=block",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Permissions-Policy": "camera=(), microphone=(), geolocation=()",
+  "Strict-Transport-Security": "max-age=31536000; includeSubDomains",
+};
+
+/**
+ * Apply security headers to a response
+ */
+function applySecurityHeaders(response: NextResponse): NextResponse {
+  for (const [key, value] of Object.entries(SECURITY_HEADERS)) {
+    response.headers.set(key, value);
+  }
+  return response;
+}
+
 export async function proxy(request: NextRequest) {
   const { pathname } = request.nextUrl;
 
+  // API routes - apply security headers but skip auth check (handled in route)
   if (pathname.startsWith("/api")) {
-    return NextResponse.next();
+    const response = NextResponse.next();
+    return applySecurityHeaders(response);
   }
 
+  // Static files - skip all processing
   if (pathname.startsWith("/_next") || pathname.includes(".")) {
     return NextResponse.next();
   }
@@ -28,9 +53,11 @@ export async function proxy(request: NextRequest) {
 
   if (!token) {
     if (isPublicRoute) {
-      return NextResponse.next();
+      const response = NextResponse.next();
+      return applySecurityHeaders(response);
     }
-    return NextResponse.redirect(new URL("/sign-in", request.url));
+    const response = NextResponse.redirect(new URL("/sign-in", request.url));
+    return applySecurityHeaders(response);
   }
 
   try {
@@ -38,14 +65,17 @@ export async function proxy(request: NextRequest) {
     await jwtVerify(token, secret);
 
     if (isAuthRoute) {
-      return NextResponse.redirect(new URL("/", request.url));
+      const response = NextResponse.redirect(new URL("/", request.url));
+      return applySecurityHeaders(response);
     }
 
-    return NextResponse.next();
+    const response = NextResponse.next();
+    return applySecurityHeaders(response);
   } catch {
+    // Invalid or expired token - clear cookie and redirect
     const response = NextResponse.redirect(new URL("/sign-in", request.url));
     response.cookies.delete("collabos_token");
-    return response;
+    return applySecurityHeaders(response);
   }
 }
 

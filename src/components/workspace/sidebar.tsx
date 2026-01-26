@@ -14,6 +14,7 @@ import {
   ChevronDown,
   ChevronRight,
   Sparkles,
+  Zap,
 } from "lucide-react";
 import { motion, AnimatePresence } from "motion/react";
 import { cn } from "@/lib/utils";
@@ -65,10 +66,17 @@ const getWorkspaceItems = (workspaceId: string) => [
     exact: true,
   },
   {
+    title: "Automations",
+    href: `/workspace/${workspaceId}/automations`,
+    icon: Zap,
+    disabled: false,
+    exact: true,
+  },
+  {
     title: "Settings",
     href: `/workspace/${workspaceId}/settings`,
     icon: Settings,
-    disabled: true,
+    disabled: false,
     exact: true,
   },
 ];

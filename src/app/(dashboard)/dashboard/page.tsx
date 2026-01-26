@@ -1,6 +1,7 @@
 import { getCurrentUser } from "@/lib/session";
 import { prisma } from "@/lib/prisma";
 import { getNextTierInfo, type Tier } from "@/lib/coins";
+import Link from "next/link";
 import {
   Card,
   CardContent,
@@ -8,7 +9,21 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Coins, Trophy, TrendingUp, Zap } from "lucide-react";
+import {
+  Coins,
+  Trophy,
+  TrendingUp,
+  Zap,
+  FolderKanban,
+  ListTodo,
+  Building2,
+  ArrowRight,
+  Circle,
+  Clock,
+  CheckCircle2,
+  Flag,
+} from "lucide-react";
+import { cn } from "@/lib/utils";
 
 const tierColors: Record<Tier, { bg: string; text: string; border: string }> = {
   FREE: { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-300" },
@@ -42,6 +57,48 @@ export default async function DashboardPage() {
       coins: true,
       tier: true,
     },
+  });
+
+  // Get user's workspaces
+  const workspaceMemberships = await prisma.workspaceMember.findMany({
+    where: { userId: sessionUser?.id },
+    include: {
+      workspace: true,
+    },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  });
+
+  const workspaces = workspaceMemberships.map((m) => m.workspace);
+
+  // Get recent projects across all workspaces
+  const recentProjects = await prisma.project.findMany({
+    where: {
+      workspaceId: { in: workspaces.map((w) => w.id) },
+    },
+    include: {
+      workspace: { select: { name: true } },
+      _count: { select: { tasks: true } },
+      tasks: { select: { status: true } },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 5,
+  });
+
+  // Get tasks assigned to user
+  const myTasks = await prisma.task.findMany({
+    where: {
+      assignedTo: sessionUser?.id,
+    },
+    include: {
+      project: {
+        include: {
+          workspace: { select: { id: true, name: true } },
+        },
+      },
+    },
+    orderBy: { createdAt: "desc" },
+    take: 5,
   });
 
   const tierInfo = getNextTierInfo(user?.coins ?? 0);
@@ -171,6 +228,174 @@ export default async function DashboardPage() {
               {currentTier === "ELITE" && "All Pro benefits + exclusive tools"}
               {currentTier === "LEGEND" && "Full access to all features"}
             </p>
+          </CardContent>
+        </Card>
+      </div>
+
+      {/* Recent Projects and Tasks Section */}
+      <div className="grid gap-6 lg:grid-cols-3">
+        {/* Recent Workspaces */}
+        <Card className="transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div className="flex items-center gap-2">
+              <Building2 className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-base">Recent Workspaces</CardTitle>
+            </div>
+            <Link
+              href="/dashboard/workspaces"
+              className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1"
+            >
+              View all
+              <ArrowRight className="h-3.5 w-3.5" />
+            </Link>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {workspaces.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No workspaces yet
+              </p>
+            ) : (
+              workspaces.map((workspace) => (
+                <Link
+                  key={workspace.id}
+                  href={`/workspace/${workspace.id}`}
+                  className="flex items-center gap-3 p-2 rounded-lg hover:bg-muted transition-colors"
+                >
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10">
+                    <Building2 className="h-4 w-4 text-primary" />
+                  </div>
+                  <span className="text-sm font-medium truncate">
+                    {workspace.name}
+                  </span>
+                </Link>
+              ))
+            )}
+          </CardContent>
+        </Card>
+
+        {/* Recent Projects */}
+        <Card className="transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div className="flex items-center gap-2">
+              <FolderKanban className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-base">Recent Projects</CardTitle>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {recentProjects.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No projects yet
+              </p>
+            ) : (
+              recentProjects.map((project) => {
+                const totalTasks = project.tasks.length;
+                const doneTasks = project.tasks.filter(
+                  (t) => t.status === "DONE",
+                ).length;
+                const progress =
+                  totalTasks > 0
+                    ? Math.round((doneTasks / totalTasks) * 100)
+                    : 0;
+
+                return (
+                  <Link
+                    key={project.id}
+                    href={`/workspace/${project.workspaceId}/projects/${project.id}`}
+                    className="block p-2 rounded-lg hover:bg-muted transition-colors"
+                  >
+                    <div className="flex items-center justify-between mb-1">
+                      <span className="text-sm font-medium truncate">
+                        {project.name}
+                      </span>
+                      <span className="text-xs text-muted-foreground">
+                        {progress}%
+                      </span>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <div className="flex-1 h-1.5 rounded-full bg-muted overflow-hidden">
+                        <div
+                          className={cn(
+                            "h-full rounded-full transition-all",
+                            progress === 100
+                              ? "bg-emerald-500"
+                              : progress > 50
+                                ? "bg-cyan-500"
+                                : progress > 0
+                                  ? "bg-amber-500"
+                                  : "bg-muted-foreground/20",
+                          )}
+                          style={{ width: `${progress}%` }}
+                        />
+                      </div>
+                      <span className="text-[10px] text-muted-foreground">
+                        {project.workspace.name}
+                      </span>
+                    </div>
+                  </Link>
+                );
+              })
+            )}
+          </CardContent>
+        </Card>
+
+        {/* My Tasks */}
+        <Card className="transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20">
+          <CardHeader className="flex flex-row items-center justify-between pb-2">
+            <div className="flex items-center gap-2">
+              <ListTodo className="h-5 w-5 text-muted-foreground" />
+              <CardTitle className="text-base">My Tasks</CardTitle>
+            </div>
+            <span className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+              {myTasks.length}
+            </span>
+          </CardHeader>
+          <CardContent className="space-y-2">
+            {myTasks.length === 0 ? (
+              <p className="text-sm text-muted-foreground text-center py-4">
+                No tasks assigned to you
+              </p>
+            ) : (
+              myTasks.map((task) => (
+                <Link
+                  key={task.id}
+                  href={`/workspace/${task.project.workspace.id}/projects/${task.projectId}`}
+                  className="block p-2 rounded-lg hover:bg-muted transition-colors"
+                >
+                  <div className="flex items-start gap-2">
+                    <div
+                      className={cn(
+                        "mt-0.5",
+                        task.status === "DONE" && "text-emerald-500",
+                        task.status === "IN_PROGRESS" && "text-amber-500",
+                        task.status === "TODO" && "text-slate-400",
+                      )}
+                    >
+                      {task.status === "DONE" && (
+                        <CheckCircle2 className="h-4 w-4" />
+                      )}
+                      {task.status === "IN_PROGRESS" && (
+                        <Clock className="h-4 w-4" />
+                      )}
+                      {task.status === "TODO" && <Circle className="h-4 w-4" />}
+                    </div>
+                    <div className="flex-1 min-w-0">
+                      <p
+                        className={cn(
+                          "text-sm font-medium truncate",
+                          task.status === "DONE" &&
+                            "line-through text-muted-foreground",
+                        )}
+                      >
+                        {task.title}
+                      </p>
+                      <p className="text-[10px] text-muted-foreground">
+                        {task.project.name}
+                      </p>
+                    </div>
+                  </div>
+                </Link>
+              ))
+            )}
           </CardContent>
         </Card>
       </div>

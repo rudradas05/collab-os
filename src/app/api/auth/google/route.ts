@@ -3,17 +3,31 @@ import { prisma } from "@/lib/prisma";
 import { createToken, createAuthCookie } from "@/lib/auth";
 import { googleAuthSchema } from "@/lib/validations";
 import { verifyGoogleToken } from "@/lib/google";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  getClientIdentifier,
+  RATE_LIMITS,
+} from "@/lib/rate-limit";
+import { ApiErrors, handleZodError } from "@/lib/api-errors";
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting for auth (10/min)
+    const clientId = getClientIdentifier(request);
+    const rateLimitResult = checkRateLimit(
+      `auth:google:${clientId}`,
+      RATE_LIMITS.AUTH,
+    );
+    if (!rateLimitResult.success) {
+      return rateLimitResponse(rateLimitResult);
+    }
+
     const body = await request.json();
     const result = googleAuthSchema.safeParse(body);
 
     if (!result.success) {
-      return NextResponse.json(
-        { error: result.error.issues[0].message },
-        { status: 400 },
-      );
+      return handleZodError(result.error);
     }
 
     const { credential } = result.data;
@@ -21,10 +35,7 @@ export async function POST(request: NextRequest) {
     const googleUser = await verifyGoogleToken(credential);
 
     if (!googleUser) {
-      return NextResponse.json(
-        { error: "Invalid Google credential" },
-        { status: 401 },
-      );
+      return ApiErrors.unauthorized("Invalid Google credential");
     }
 
     let user = await prisma.user.findFirst({
@@ -74,9 +85,6 @@ export async function POST(request: NextRequest) {
     return response;
   } catch (error) {
     console.error("Google auth error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError();
   }
 }

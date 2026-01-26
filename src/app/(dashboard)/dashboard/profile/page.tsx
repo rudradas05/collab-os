@@ -8,28 +8,8 @@ import {
   CardHeader,
   CardTitle,
 } from "@/components/ui/card";
-import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
-import { Separator } from "@/components/ui/separator";
 import { Coins, History, ArrowUpCircle, ArrowDownCircle } from "lucide-react";
-
-const tierColors: Record<Tier, { bg: string; text: string; border: string }> = {
-  FREE: { bg: "bg-gray-100", text: "text-gray-700", border: "border-gray-300" },
-  PRO: {
-    bg: "bg-blue-100",
-    text: "text-blue-700",
-    border: "border-blue-300",
-  },
-  ELITE: {
-    bg: "bg-purple-100",
-    text: "text-purple-700",
-    border: "border-purple-300",
-  },
-  LEGEND: {
-    bg: "bg-amber-100",
-    text: "text-amber-700",
-    border: "border-amber-300",
-  },
-};
+import { ProfileEditor } from "@/components/dashboard/profile-editor";
 
 function formatDate(date: Date): string {
   return new Intl.DateTimeFormat("en-US", {
@@ -71,22 +51,32 @@ export default async function ProfilePage() {
 
   const tierInfo = getNextTierInfo(user?.coins ?? 0);
   const currentTier = (user?.tier as Tier) || "FREE";
-  const tierStyle = tierColors[currentTier];
 
-  const getInitials = (name: string) => {
-    return name
-      .split(" ")
-      .map((n) => n[0])
-      .join("")
-      .toUpperCase()
-      .slice(0, 2);
+  // Prepare user data for the client component
+  const userData = {
+    id: user?.id || "",
+    name: user?.name || "",
+    email: user?.email || "",
+    role: user?.role || "USER",
+    avatar: user?.avatar || null,
+    coins: user?.coins ?? 0,
+    tier: currentTier,
+  };
+
+  const tierData = {
+    currentTier,
+    nextTier: tierInfo.nextTier,
+    coinsToNext: tierInfo.coinsToNext,
+    progressPercent: tierInfo.progressPercent,
   };
 
   return (
     <div className="space-y-6">
       <div>
         <h1 className="text-3xl font-bold tracking-tight">Profile</h1>
-        <p className="text-muted-foreground">View your account information</p>
+        <p className="text-muted-foreground">
+          View and edit your account information
+        </p>
       </div>
 
       <Card className="transition-all duration-300 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/20">
@@ -96,79 +86,8 @@ export default async function ProfilePage() {
             Your personal details and account settings
           </CardDescription>
         </CardHeader>
-        <CardContent className="space-y-6">
-          <div className="flex items-center gap-4">
-            <Avatar className="h-20 w-20 transition-all duration-300 hover:ring-4 hover:ring-primary/20 hover:scale-105">
-              <AvatarImage src={user?.avatar || undefined} alt={user?.name} />
-              <AvatarFallback className="text-xl">
-                {getInitials(user?.name || "")}
-              </AvatarFallback>
-            </Avatar>
-            <div>
-              <h2 className="text-xl font-semibold">{user?.name}</h2>
-              <p className="text-muted-foreground">{user?.email}</p>
-              <span
-                className={`mt-1 inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-semibold ${tierStyle.bg} ${tierStyle.text} border ${tierStyle.border}`}
-              >
-                {currentTier}
-              </span>
-            </div>
-          </div>
-
-          <Separator />
-
-          <div className="grid gap-4 md:grid-cols-2">
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">
-                Full Name
-              </p>
-              <p className="text-base">{user?.name}</p>
-            </div>
-
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">
-                Email Address
-              </p>
-              <p className="text-base">{user?.email}</p>
-            </div>
-
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">
-                Account Role
-              </p>
-              <p className="text-base capitalize">{user?.role.toLowerCase()}</p>
-            </div>
-
-            <div className="space-y-1">
-              <p className="text-sm font-medium text-muted-foreground">
-                Coin Balance
-              </p>
-              <div className="flex items-center gap-2">
-                <Coins className="h-4 w-4 text-primary" />
-                <p className="text-base font-semibold">{user?.coins ?? 0}</p>
-              </div>
-            </div>
-          </div>
-
-          <div className="space-y-2">
-            <div className="flex items-center justify-between">
-              <p className="text-sm font-medium text-muted-foreground">
-                Progress to {tierInfo.nextTier ?? "Max Tier"}
-              </p>
-              <p className="text-sm font-medium">{tierInfo.progressPercent}%</p>
-            </div>
-            <div className="h-2 w-full rounded-full bg-secondary">
-              <div
-                className="h-2 rounded-full bg-primary transition-all duration-500"
-                style={{ width: `${tierInfo.progressPercent}%` }}
-              />
-            </div>
-            {tierInfo.nextTier && (
-              <p className="text-xs text-muted-foreground">
-                {tierInfo.coinsToNext} more coins needed for {tierInfo.nextTier}
-              </p>
-            )}
-          </div>
+        <CardContent>
+          <ProfileEditor user={userData} tierInfo={tierData} />
         </CardContent>
       </Card>
 

@@ -13,6 +13,7 @@ import {
   Trash2,
   Coins,
   GripVertical,
+  Flag,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -38,13 +39,16 @@ import {
 import Link from "next/link";
 
 type TaskStatus = "TODO" | "IN_PROGRESS" | "DONE";
+type TaskPriority = "LOW" | "MEDIUM" | "HIGH";
 
 interface Task {
   id: string;
   title: string;
   status: TaskStatus;
+  priority: TaskPriority;
   projectId: string;
   assignedTo: string | null;
+  dueDate: string | null;
   completedAt: string | null;
   createdAt: string;
   assignee: {
@@ -87,6 +91,29 @@ const STATUS_CONFIG: Record<
 
 const STATUSES: TaskStatus[] = ["TODO", "IN_PROGRESS", "DONE"];
 
+const PRIORITY_CONFIG: Record<
+  TaskPriority,
+  { label: string; color: string; bgColor: string }
+> = {
+  LOW: {
+    label: "Low",
+    color: "text-emerald-600",
+    bgColor: "bg-emerald-100 dark:bg-emerald-900/30",
+  },
+  MEDIUM: {
+    label: "Medium",
+    color: "text-amber-600",
+    bgColor: "bg-amber-100 dark:bg-amber-900/30",
+  },
+  HIGH: {
+    label: "High",
+    color: "text-red-600",
+    bgColor: "bg-red-100 dark:bg-red-900/30",
+  },
+};
+
+const PRIORITIES: TaskPriority[] = ["LOW", "MEDIUM", "HIGH"];
+
 export default function ProjectTasksPage() {
   const params = useParams();
   const router = useRouter();
@@ -100,6 +127,7 @@ export default function ProjectTasksPage() {
   const [isCreating, setIsCreating] = useState(false);
   const [deleteTask, setDeleteTask] = useState<Task | null>(null);
   const [taskTitle, setTaskTitle] = useState("");
+  const [taskPriority, setTaskPriority] = useState<TaskPriority>("MEDIUM");
 
   const fetchProject = useCallback(async () => {
     try {
@@ -155,6 +183,7 @@ export default function ProjectTasksPage() {
         body: JSON.stringify({
           title: taskTitle.trim(),
           projectId,
+          priority: taskPriority,
         }),
       });
 
@@ -173,6 +202,7 @@ export default function ProjectTasksPage() {
 
       setTasks((prev) => [data.task, ...prev]);
       setTaskTitle("");
+      setTaskPriority("MEDIUM");
       setIsCreateOpen(false);
     } catch {
       toast.dismiss(loadingToast);
@@ -320,6 +350,29 @@ export default function ProjectTasksPage() {
                   autoFocus
                 />
               </div>
+              <div className="space-y-2">
+                <Label>Priority</Label>
+                <div className="flex gap-2">
+                  {PRIORITIES.map((priority) => {
+                    const config = PRIORITY_CONFIG[priority];
+                    return (
+                      <button
+                        key={priority}
+                        type="button"
+                        onClick={() => setTaskPriority(priority)}
+                        className={`flex items-center gap-1.5 px-3 py-1.5 rounded-lg border text-sm font-medium transition-all ${
+                          taskPriority === priority
+                            ? `${config.bgColor} ${config.color} border-current`
+                            : "bg-muted/50 text-muted-foreground border-transparent hover:bg-muted"
+                        }`}
+                      >
+                        <Flag className="h-3.5 w-3.5" />
+                        {config.label}
+                      </button>
+                    );
+                  })}
+                </div>
+              </div>
               <div className="flex justify-end gap-3 pt-2">
                 <Button
                   type="button"
@@ -393,9 +446,17 @@ export default function ProjectTasksPage() {
                         <div className="flex items-start gap-2">
                           <GripVertical className="h-4 w-4 text-muted-foreground/50 mt-0.5 opacity-0 group-hover:opacity-100 transition-opacity cursor-grab" />
                           <div className="flex-1 min-w-0">
-                            <p className="font-medium text-foreground text-sm truncate">
-                              {task.title}
-                            </p>
+                            <div className="flex items-center gap-2 mb-1">
+                              <p className="font-medium text-foreground text-sm truncate flex-1">
+                                {task.title}
+                              </p>
+                              <span
+                                className={`inline-flex items-center gap-1 px-1.5 py-0.5 rounded text-[10px] font-medium ${PRIORITY_CONFIG[task.priority].bgColor} ${PRIORITY_CONFIG[task.priority].color}`}
+                              >
+                                <Flag className="h-2.5 w-2.5" />
+                                {PRIORITY_CONFIG[task.priority].label}
+                              </span>
+                            </div>
                             <div className="flex items-center gap-2 mt-2">
                               {STATUSES.filter((s) => s !== status).map((s) => (
                                 <button

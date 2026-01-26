@@ -2,6 +2,14 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { addCoins, type Tier } from "@/lib/coins";
+import { aiChatSchema } from "@/lib/validations";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  RATE_LIMITS,
+  getClientIdentifier,
+} from "@/lib/rate-limit";
+import { handleZodError, ApiErrors } from "@/lib/api-errors";
 
 const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const AI_COST = 2;
@@ -77,27 +85,29 @@ async function callGemini(prompt: string): Promise<string> {
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting for AI (20/hour)
+    const clientId = getClientIdentifier(request);
+    const rateLimitResult = checkRateLimit(
+      `ai:chat:${clientId}`,
+      RATE_LIMITS.AI,
+    );
+    if (!rateLimitResult.success) {
+      return rateLimitResponse(rateLimitResult);
+    }
+
     const user = await getCurrentUser(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return ApiErrors.unauthorized();
     }
 
     const body = await request.json();
-    const { workspaceId, message } = body;
+    const parseResult = aiChatSchema.safeParse(body);
 
-    if (!workspaceId || typeof workspaceId !== "string") {
-      return NextResponse.json(
-        { error: "Workspace ID is required" },
-        { status: 400 },
-      );
+    if (!parseResult.success) {
+      return handleZodError(parseResult.error);
     }
 
-    if (!message || typeof message !== "string" || !message.trim()) {
-      return NextResponse.json(
-        { error: "Message is required" },
-        { status: 400 },
-      );
-    }
+    const { workspaceId, message } = parseResult.data;
 
     // Verify user is member of workspace
     const membership = await prisma.workspaceMember.findUnique({
@@ -110,10 +120,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!membership) {
-      return NextResponse.json(
-        { error: "You are not a member of this workspace" },
-        { status: 403 },
-      );
+      return ApiErrors.forbidden("You are not a member of this workspace");
     }
 
     // Get user's current data
@@ -123,7 +130,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!userData) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return ApiErrors.notFound("User");
     }
 
     const userTier = (userData.tier as Tier) || "FREE";
@@ -250,10 +257,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("AI chat error:", error);
-    return NextResponse.json(
-      { error: "Failed to process AI request" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError("Failed to process AI request");
   }
 }
 
@@ -261,17 +265,14 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return ApiErrors.unauthorized();
     }
 
     const { searchParams } = new URL(request.url);
     const workspaceId = searchParams.get("workspaceId");
 
     if (!workspaceId) {
-      return NextResponse.json(
-        { error: "Workspace ID is required" },
-        { status: 400 },
-      );
+      return ApiErrors.badRequest("Workspace ID is required");
     }
 
     // Verify user is member of workspace
@@ -285,10 +286,7 @@ export async function GET(request: NextRequest) {
     });
 
     if (!membership) {
-      return NextResponse.json(
-        { error: "You are not a member of this workspace" },
-        { status: 403 },
-      );
+      return ApiErrors.forbidden("You are not a member of this workspace");
     }
 
     // Get messages for this workspace
@@ -339,9 +337,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Get AI messages error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch messages" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError("Failed to fetch messages");
   }
 }

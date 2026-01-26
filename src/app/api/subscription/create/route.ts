@@ -9,9 +9,27 @@ import {
   isValidPlan,
   type SubscriptionPlan,
 } from "@/lib/stripe";
+import { createSubscriptionSchema } from "@/lib/validations";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  getClientIdentifier,
+  RATE_LIMITS,
+} from "@/lib/rate-limit";
+import { ApiErrors, handleZodError } from "@/lib/api-errors";
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting for subscription operations (5/min)
+    const clientId = getClientIdentifier(request);
+    const rateLimitResult = checkRateLimit(
+      `subscription:create:${clientId}`,
+      RATE_LIMITS.SUBSCRIPTION,
+    );
+    if (!rateLimitResult.success) {
+      return rateLimitResponse(rateLimitResult);
+    }
+
     if (!stripe) {
       return NextResponse.json(
         { error: "Stripe is not configured" },
@@ -21,24 +39,28 @@ export async function POST(request: NextRequest) {
 
     const user = await getCurrentUser(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return ApiErrors.unauthorized();
     }
 
     const body = await request.json();
-    const { plan } = body;
+    const parseResult = createSubscriptionSchema.safeParse(body);
 
-    if (!plan || !isValidPlan(plan)) {
-      return NextResponse.json(
-        { error: "Invalid plan. Must be PRO, ELITE, or LEGEND." },
-        { status: 400 },
+    if (!parseResult.success) {
+      return handleZodError(parseResult.error);
+    }
+
+    const { plan } = parseResult.data;
+
+    if (!isValidPlan(plan)) {
+      return ApiErrors.badRequest(
+        "Invalid plan. Must be PRO, ELITE, or LEGEND.",
       );
     }
 
     const priceId = getPriceId(plan);
     if (!priceId) {
-      return NextResponse.json(
-        { error: `Price ID not configured for ${plan} plan` },
-        { status: 500 },
+      return ApiErrors.internalError(
+        `Price ID not configured for ${plan} plan`,
       );
     }
 
@@ -52,10 +74,7 @@ export async function POST(request: NextRequest) {
       existingSubscription.plan === plan &&
       existingSubscription.status === "active"
     ) {
-      return NextResponse.json(
-        { error: "You already have this plan" },
-        { status: 400 },
-      );
+      return ApiErrors.badRequest("You already have this plan");
     }
 
     // Get user's coin balance
@@ -65,7 +84,7 @@ export async function POST(request: NextRequest) {
     });
 
     if (!userData) {
-      return NextResponse.json({ error: "User not found" }, { status: 404 });
+      return ApiErrors.notFound("User");
     }
 
     const planPrice = PLAN_PRICES[plan as SubscriptionPlan];
@@ -185,10 +204,7 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Subscription create error:", error);
-    return NextResponse.json(
-      { error: "Failed to create subscription" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError("Failed to create subscription");
   }
 }
 
@@ -210,7 +226,7 @@ export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return ApiErrors.unauthorized();
     }
 
     const subscription = await prisma.subscription.findUnique({
@@ -236,9 +252,6 @@ export async function GET(request: NextRequest) {
     });
   } catch (error) {
     console.error("Get subscription error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch subscription" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError("Failed to fetch subscription");
   }
 }

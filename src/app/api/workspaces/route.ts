@@ -1,44 +1,61 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { verifyToken, getTokenFromCookies } from "@/lib/auth";
+import {
+  verifyToken,
+  getTokenFromCookies,
+  unauthorizedResponse,
+} from "@/lib/auth";
 import { createWorkspaceSchema } from "@/lib/validations";
-import { Role, WorkspaceRole } from "@/generated/prisma";
+import { WorkspaceRole } from "@/generated/prisma";
+import { createNotification } from "@/lib/notifications";
+import { sendWorkspaceCreatedEmail } from "@/lib/email";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  getClientIdentifier,
+  RATE_LIMITS,
+} from "@/lib/rate-limit";
+import { ApiErrors, handleZodError } from "@/lib/api-errors";
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting for workspace creation
+    const clientId = getClientIdentifier(request);
+    const rateLimitResult = checkRateLimit(
+      `workspaces:create:${clientId}`,
+      RATE_LIMITS.GENERAL,
+    );
+    if (!rateLimitResult.success) {
+      return rateLimitResponse(rateLimitResult);
+    }
+
     const token = getTokenFromCookies(request.headers.get("cookie"));
 
     if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const payload = verifyToken(token);
 
     if (!payload) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+      return unauthorizedResponse("Invalid token");
     }
 
-    // Check if user has permission to create workspaces (OWNER or ADMIN only)
+    // Any authenticated user can create their own workspace
     const user = await prisma.user.findUnique({
       where: { id: payload.userId },
-      select: { role: true },
+      select: { id: true, name: true, email: true },
     });
 
-    if (!user || user.role === Role.USER) {
-      return NextResponse.json(
-        { error: "Only workspace owners or admins can create workspaces" },
-        { status: 403 },
-      );
+    if (!user) {
+      return ApiErrors.unauthorized("User not found");
     }
 
     const body = await request.json();
     const result = createWorkspaceSchema.safeParse(body);
 
     if (!result.success) {
-      return NextResponse.json(
-        { error: result.error.issues[0].message },
-        { status: 400 },
-      );
+      return handleZodError(result.error);
     }
 
     const { name } = result.data;
@@ -53,7 +70,7 @@ export async function POST(request: NextRequest) {
         },
       });
 
-      // Create workspace member with OWNER role
+      // Create workspace member with OWNER role (creator is always OWNER)
       await tx.workspaceMember.create({
         data: {
           userId: payload.userId,
@@ -64,6 +81,19 @@ export async function POST(request: NextRequest) {
 
       return newWorkspace;
     });
+
+    // Create in-app notification
+    await createNotification({
+      userId: payload.userId,
+      title: "Workspace Created",
+      message: `Your workspace "${workspace.name}" is ready. Start adding projects and team members!`,
+      type: "SUCCESS",
+    });
+
+    // Send email notification
+    if (user.email) {
+      await sendWorkspaceCreatedEmail(user.email, user.name, workspace.name);
+    }
 
     return NextResponse.json(
       {
@@ -77,10 +107,7 @@ export async function POST(request: NextRequest) {
     );
   } catch (error) {
     console.error("Create workspace error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError();
   }
 }
 
@@ -89,13 +116,13 @@ export async function GET(request: NextRequest) {
     const token = getTokenFromCookies(request.headers.get("cookie"));
 
     if (!token) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return unauthorizedResponse();
     }
 
     const payload = verifyToken(token);
 
     if (!payload) {
-      return NextResponse.json({ error: "Invalid token" }, { status: 401 });
+      return unauthorizedResponse("Invalid token");
     }
 
     // Get all workspaces the user is a member of
@@ -132,9 +159,6 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ workspaces }, { status: 200 });
   } catch (error) {
     console.error("List workspaces error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError();
   }
 }

@@ -41,10 +41,10 @@ export async function DELETE(
       );
     }
 
-    // Only OWNER can delete projects
-    if (membership.role !== "OWNER") {
+    // Only OWNER or ADMIN can delete projects
+    if (membership.role !== "OWNER" && membership.role !== "ADMIN") {
       return NextResponse.json(
-        { error: "Only workspace owners can delete projects" },
+        { error: "Only workspace owners and admins can delete projects" },
         { status: 403 },
       );
     }

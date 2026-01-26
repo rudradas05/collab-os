@@ -9,12 +9,12 @@ datasource db {
 
 enum Role {
   USER
-  OWNER
   ADMIN
 }
 
 enum WorkspaceRole {
   OWNER
+  ADMIN
   MEMBER
 }
 
@@ -25,21 +25,23 @@ enum TaskStatus {
 }
 
 model User {
-  id                   String               @id @default(uuid())
-  email                String               @unique
+  id                   String                @id @default(uuid())
+  email                String                @unique
   name                 String
   passwordHash         String?
-  googleId             String?              @unique
+  googleId             String?               @unique
   avatar               String?
-  role                 Role                 @default(USER)
-  coins                Int                  @default(0)
-  tier                 String               @default("FREE")
-  createdAt            DateTime             @default(now())
-  ownedWorkspaces      Workspace[]          @relation("WorkspaceOwner")
+  role                 Role                  @default(USER)
+  coins                Int                   @default(0)
+  tier                 String                @default("FREE")
+  createdAt            DateTime              @default(now())
+  ownedWorkspaces      Workspace[]           @relation("WorkspaceOwner")
   workspaceMemberships WorkspaceMember[]
   passwordResetTokens  PasswordResetToken[]
-  assignedTasks        Task[]               @relation("TaskAssignee")
+  assignedTasks        Task[]                @relation("TaskAssignee")
   coinTransactions     CoinTransaction[]
+  invitationsSent      WorkspaceInvitation[] @relation("InvitationsSent")
+  invitationsReceived  WorkspaceInvitation[] @relation("InvitationsReceived")
 }
 
 model PasswordResetToken {
@@ -57,13 +59,14 @@ model PasswordResetToken {
 }
 
 model Workspace {
-  id        String            @id @default(uuid())
-  name      String
-  ownerId   String
-  createdAt DateTime          @default(now())
-  owner     User              @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
-  members   WorkspaceMember[]
-  projects  Project[]
+  id          String                @id @default(uuid())
+  name        String
+  ownerId     String
+  createdAt   DateTime              @default(now())
+  owner       User                  @relation("WorkspaceOwner", fields: [ownerId], references: [id], onDelete: Cascade)
+  members     WorkspaceMember[]
+  projects    Project[]
+  invitations WorkspaceInvitation[]
 }
 
 model WorkspaceMember {
@@ -90,16 +93,24 @@ model Project {
   @@index([workspaceId])
 }
 
+enum TaskPriority {
+  LOW
+  MEDIUM
+  HIGH
+}
+
 model Task {
-  id          String     @id @default(uuid())
+  id          String       @id @default(uuid())
   title       String
-  status      TaskStatus @default(TODO)
+  status      TaskStatus   @default(TODO)
+  priority    TaskPriority @default(MEDIUM)
   projectId   String
   assignedTo  String?
+  dueDate     DateTime?
   completedAt DateTime?
-  createdAt   DateTime   @default(now())
-  project     Project    @relation(fields: [projectId], references: [id], onDelete: Cascade)
-  assignee    User?      @relation("TaskAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
+  createdAt   DateTime     @default(now())
+  project     Project      @relation(fields: [projectId], references: [id], onDelete: Cascade)
+  assignee    User?        @relation("TaskAssignee", fields: [assignedTo], references: [id], onDelete: SetNull)
 
   @@index([projectId])
   @@index([assignedTo])
@@ -161,9 +172,45 @@ model Notification {
   title     String
   message   String
   type      String // INFO | SUCCESS | WARNING
+  metadata  String? // JSON string for additional data (e.g., invitation info)
   read      Boolean  @default(false)
   createdAt DateTime @default(now())
 
   @@index([userId])
   @@index([createdAt])
+}
+
+model Automation {
+  id          String   @id @default(uuid())
+  workspaceId String
+  type        String // TASK_DONE | DEADLINE | PROJECT_CREATED
+  enabled     Boolean  @default(true)
+  createdAt   DateTime @default(now())
+
+  @@unique([workspaceId, type])
+  @@index([workspaceId])
+}
+
+enum InvitationStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+}
+
+model WorkspaceInvitation {
+  id          String           @id @default(uuid())
+  workspaceId String
+  inviterId   String
+  inviteeId   String
+  status      InvitationStatus @default(PENDING)
+  createdAt   DateTime         @default(now())
+  respondedAt DateTime?
+
+  workspace Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  inviter   User      @relation("InvitationsSent", fields: [inviterId], references: [id], onDelete: Cascade)
+  invitee   User      @relation("InvitationsReceived", fields: [inviteeId], references: [id], onDelete: Cascade)
+
+  @@unique([workspaceId, inviteeId])
+  @@index([inviteeId])
+  @@index([workspaceId])
 }

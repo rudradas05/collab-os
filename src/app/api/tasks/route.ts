@@ -1,22 +1,31 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
+import { createTaskSchema } from "@/lib/validations";
+import {
+  requireWorkspaceMember,
+  requireWorkspaceAdminOrOwner,
+} from "@/lib/workspace";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  getClientIdentifier,
+  RATE_LIMITS,
+} from "@/lib/rate-limit";
+import { ApiErrors, handleZodError } from "@/lib/api-errors";
 
 export async function GET(request: NextRequest) {
   try {
     const user = await getCurrentUser(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return ApiErrors.unauthorized();
     }
 
     const { searchParams } = new URL(request.url);
     const projectId = searchParams.get("projectId");
 
     if (!projectId) {
-      return NextResponse.json(
-        { error: "projectId is required" },
-        { status: 400 },
-      );
+      return ApiErrors.badRequest("projectId is required");
     }
 
     // Get project with workspace to verify access
@@ -25,24 +34,17 @@ export async function GET(request: NextRequest) {
     });
 
     if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      return ApiErrors.notFound("Project");
     }
 
-    // Verify user is member of workspace
-    const membership = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: {
-          userId: user.id,
-          workspaceId: project.workspaceId,
-        },
-      },
-    });
+    // Verify user is member of workspace (any role can view tasks)
+    const permission = await requireWorkspaceMember(
+      project.workspaceId,
+      user.id,
+    );
 
-    if (!membership) {
-      return NextResponse.json(
-        { error: "You are not a member of this workspace" },
-        { status: 403 },
-      );
+    if (!permission.allowed) {
+      return ApiErrors.forbidden("You are not a member of this workspace");
     }
 
     const tasks = await prisma.task.findMany({
@@ -63,36 +65,36 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ tasks });
   } catch (error) {
     console.error("Get tasks error:", error);
-    return NextResponse.json(
-      { error: "Failed to fetch tasks" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError("Failed to fetch tasks");
   }
 }
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting for task creation
+    const clientId = getClientIdentifier(request);
+    const rateLimitResult = checkRateLimit(
+      `tasks:create:${clientId}`,
+      RATE_LIMITS.GENERAL,
+    );
+    if (!rateLimitResult.success) {
+      return rateLimitResponse(rateLimitResult);
+    }
+
     const user = await getCurrentUser(request);
     if (!user) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return ApiErrors.unauthorized();
     }
 
     const body = await request.json();
-    const { title, projectId, assignedTo } = body;
+    const parseResult = createTaskSchema.safeParse(body);
 
-    if (!title || typeof title !== "string" || !title.trim()) {
-      return NextResponse.json(
-        { error: "Task title is required" },
-        { status: 400 },
-      );
+    if (!parseResult.success) {
+      return handleZodError(parseResult.error);
     }
 
-    if (!projectId) {
-      return NextResponse.json(
-        { error: "projectId is required" },
-        { status: 400 },
-      );
-    }
+    const { title, projectId, assignedTo, priority, dueDate } =
+      parseResult.data;
 
     // Get project with workspace to verify access
     const project = await prisma.project.findUnique({
@@ -100,23 +102,18 @@ export async function POST(request: NextRequest) {
     });
 
     if (!project) {
-      return NextResponse.json({ error: "Project not found" }, { status: 404 });
+      return ApiErrors.notFound("Project");
     }
 
-    // Verify user is member of workspace
-    const membership = await prisma.workspaceMember.findUnique({
-      where: {
-        userId_workspaceId: {
-          userId: user.id,
-          workspaceId: project.workspaceId,
-        },
-      },
-    });
+    // Only OWNER or ADMIN can create tasks
+    const permission = await requireWorkspaceAdminOrOwner(
+      project.workspaceId,
+      user.id,
+    );
 
-    if (!membership) {
-      return NextResponse.json(
-        { error: "You are not a member of this workspace" },
-        { status: 403 },
+    if (!permission.allowed) {
+      return ApiErrors.forbidden(
+        "Only workspace owners or admins can create tasks",
       );
     }
 
@@ -132,10 +129,7 @@ export async function POST(request: NextRequest) {
       });
 
       if (!assigneeMembership) {
-        return NextResponse.json(
-          { error: "Assignee must be a workspace member" },
-          { status: 400 },
-        );
+        return ApiErrors.badRequest("Assignee must be a workspace member");
       }
     }
 
@@ -144,6 +138,8 @@ export async function POST(request: NextRequest) {
         title: title.trim(),
         projectId,
         assignedTo: assignedTo || null,
+        priority: priority || "MEDIUM",
+        dueDate: dueDate ? new Date(dueDate) : null,
       },
       include: {
         assignee: {
@@ -160,9 +156,6 @@ export async function POST(request: NextRequest) {
     return NextResponse.json({ task }, { status: 201 });
   } catch (error) {
     console.error("Create task error:", error);
-    return NextResponse.json(
-      { error: "Failed to create task" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError("Failed to create task");
   }
 }

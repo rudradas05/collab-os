@@ -1,26 +1,35 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import bcrypt from "bcrypt";
+import { resetPasswordSchema } from "@/lib/validations";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  getClientIdentifier,
+  RATE_LIMITS,
+} from "@/lib/rate-limit";
+import { ApiErrors, handleZodError } from "@/lib/api-errors";
 
 export async function POST(request: NextRequest) {
   try {
+    // Rate limiting for auth (10/min)
+    const clientId = getClientIdentifier(request);
+    const rateLimitResult = checkRateLimit(
+      `auth:reset-password:${clientId}`,
+      RATE_LIMITS.AUTH,
+    );
+    if (!rateLimitResult.success) {
+      return rateLimitResponse(rateLimitResult);
+    }
+
     const body = await request.json();
-    const { token, otp, password } = body;
+    const parseResult = resetPasswordSchema.safeParse(body);
 
-    if (!token || !otp || !password) {
-      return NextResponse.json(
-        { error: "Token, OTP, and password are required" },
-        { status: 400 },
-      );
+    if (!parseResult.success) {
+      return handleZodError(parseResult.error);
     }
 
-    // Validate password
-    if (password.length < 8) {
-      return NextResponse.json(
-        { error: "Password must be at least 8 characters long" },
-        { status: 400 },
-      );
-    }
+    const { token, otp, password } = parseResult.data;
 
     // Find the reset token
     const resetToken = await prisma.passwordResetToken.findUnique({
@@ -29,31 +38,24 @@ export async function POST(request: NextRequest) {
     });
 
     if (!resetToken) {
-      return NextResponse.json(
-        { error: "Invalid or expired reset link" },
-        { status: 400 },
-      );
+      return ApiErrors.badRequest("Invalid or expired reset link");
     }
 
     // Check if token is expired
     if (new Date() > resetToken.expiresAt) {
-      return NextResponse.json(
-        { error: "Reset link has expired. Please request a new one." },
-        { status: 400 },
+      return ApiErrors.badRequest(
+        "Reset link has expired. Please request a new one.",
       );
     }
 
     // Check if token is already used
     if (resetToken.used) {
-      return NextResponse.json(
-        { error: "This reset link has already been used." },
-        { status: 400 },
-      );
+      return ApiErrors.badRequest("This reset link has already been used.");
     }
 
     // Verify OTP
     if (resetToken.otp !== otp) {
-      return NextResponse.json({ error: "Invalid OTP" }, { status: 400 });
+      return ApiErrors.badRequest("Invalid OTP");
     }
 
     // Hash new password
@@ -77,9 +79,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Reset password error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError();
   }
 }

@@ -7,8 +7,8 @@ import {
   Building2,
   Users,
   Crown,
-  Trash2,
-  AlertTriangle,
+  UsersRound,
+  Shield,
 } from "lucide-react";
 import { motion } from "motion/react";
 import { toast } from "sonner";
@@ -31,21 +31,11 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-} from "@/components/ui/alert-dialog";
 
 interface Workspace {
   id: string;
   name: string;
-  role: "OWNER" | "MEMBER";
+  role: "OWNER" | "ADMIN" | "MEMBER";
   owner: {
     id: string;
     name: string;
@@ -59,7 +49,7 @@ interface User {
   id: string;
   name: string;
   email: string;
-  role: "USER" | "OWNER" | "ADMIN";
+  role: "USER" | "ADMIN";
 }
 
 export default function WorkspacesPage() {
@@ -68,15 +58,11 @@ export default function WorkspacesPage() {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isCreating, setIsCreating] = useState(false);
-  const [isDeleting, setIsDeleting] = useState(false);
   const [dialogOpen, setDialogOpen] = useState(false);
-  const [deleteDialogOpen, setDeleteDialogOpen] = useState(false);
-  const [workspaceToDelete, setWorkspaceToDelete] = useState<Workspace | null>(
-    null,
-  );
   const [workspaceName, setWorkspaceName] = useState("");
 
-  const canCreateWorkspace = user?.role === "OWNER" || user?.role === "ADMIN";
+  // Any authenticated user can create their own workspace
+  const canCreateWorkspace = !!user;
 
   useEffect(() => {
     fetchUser();
@@ -154,57 +140,6 @@ export default function WorkspacesPage() {
       });
     } finally {
       setIsCreating(false);
-    }
-  };
-
-  const handleDeleteClick = (e: React.MouseEvent, workspace: Workspace) => {
-    e.stopPropagation();
-    setWorkspaceToDelete(workspace);
-    setDeleteDialogOpen(true);
-  };
-
-  const handleDeleteWorkspace = async () => {
-    if (!workspaceToDelete) return;
-
-    setIsDeleting(true);
-    const loadingToast = toast.loading("Deleting workspace...");
-
-    // Optimistic update - remove from list immediately
-    const previousWorkspaces = [...workspaces];
-    setWorkspaces((prev) => prev.filter((w) => w.id !== workspaceToDelete.id));
-    setDeleteDialogOpen(false);
-
-    try {
-      const response = await fetch(`/api/workspaces/${workspaceToDelete.id}`, {
-        method: "DELETE",
-      });
-
-      const data = await response.json();
-
-      if (!response.ok) {
-        // Revert on error
-        setWorkspaces(previousWorkspaces);
-        toast.dismiss(loadingToast);
-        toast.error("Failed to delete workspace", {
-          description: data.error,
-        });
-        return;
-      }
-
-      toast.dismiss(loadingToast);
-      toast.success("Workspace deleted", {
-        description: `${workspaceToDelete.name} has been deleted permanently.`,
-      });
-      setWorkspaceToDelete(null);
-    } catch {
-      // Revert on error
-      setWorkspaces(previousWorkspaces);
-      toast.dismiss(loadingToast);
-      toast.error("Failed to delete workspace", {
-        description: "Please try again later.",
-      });
-    } finally {
-      setIsDeleting(false);
     }
   };
 
@@ -308,100 +243,138 @@ export default function WorkspacesPage() {
           )}
         </motion.div>
       ) : (
-        <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
-          {workspaces.map((workspace, index) => (
-            <motion.div
-              key={workspace.id}
-              initial={{ opacity: 0, y: 20 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ delay: index * 0.05 }}
-            >
-              <Card
-                className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30 hover:-translate-y-1"
-                onClick={() => router.push(`/workspace/${workspace.id}`)}
-              >
-                <CardHeader>
-                  <div className="flex items-start justify-between">
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                      <Building2 className="h-5 w-5 text-primary" />
-                    </div>
-                    <div className="flex items-center gap-2">
-                      {workspace.role === "OWNER" && (
-                        <>
-                          <div className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
-                            <Crown className="h-3 w-3" />
-                            Owner
+        <div className="space-y-8">
+          {/* Your Workspaces Section */}
+          {workspaces.filter((w) => w.role === "OWNER").length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <Crown className="h-5 w-5 text-amber-500" />
+                <h2 className="text-lg font-semibold">Your Workspaces</h2>
+                <span className="text-sm text-muted-foreground">
+                  ({workspaces.filter((w) => w.role === "OWNER").length})
+                </span>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {workspaces
+                  .filter((w) => w.role === "OWNER")
+                  .map((workspace, index) => (
+                    <motion.div
+                      key={workspace.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <Card
+                        className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30 hover:-translate-y-1 border-amber-200/50"
+                        onClick={() =>
+                          router.push(`/workspace/${workspace.id}`)
+                        }
+                      >
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-amber-100">
+                              <Building2 className="h-5 w-5 text-amber-600" />
+                            </div>
+                            <div className="flex items-center gap-1 text-xs text-amber-600 bg-amber-50 px-2 py-1 rounded-full">
+                              <Crown className="h-3 w-3" />
+                              Owner
+                            </div>
                           </div>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
-                            onClick={(e) => handleDeleteClick(e, workspace)}
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
-                        </>
-                      )}
-                    </div>
-                  </div>
-                  <CardTitle className="mt-3">{workspace.name}</CardTitle>
-                  <CardDescription>
-                    Created by {workspace.owner.name}
-                  </CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-1 text-sm text-muted-foreground">
-                      <Users className="h-4 w-4" />
-                      <span>
-                        {workspace.memberCount} member
-                        {workspace.memberCount !== 1 ? "s" : ""}
-                      </span>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
-            </motion.div>
-          ))}
-        </div>
-      )}
-
-      {/* Delete Confirmation Dialog */}
-      <AlertDialog open={deleteDialogOpen} onOpenChange={setDeleteDialogOpen}>
-        <AlertDialogContent>
-          <AlertDialogHeader>
-            <div className="flex items-center gap-3 mb-2">
-              <div className="flex h-12 w-12 items-center justify-center rounded-full bg-destructive/10">
-                <AlertTriangle className="h-6 w-6 text-destructive" />
+                          <CardTitle className="mt-3">
+                            {workspace.name}
+                          </CardTitle>
+                          <CardDescription>Created by you</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                              <Users className="h-4 w-4" />
+                              <span>
+                                {workspace.memberCount} member
+                                {workspace.memberCount !== 1 ? "s" : ""}
+                              </span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
               </div>
             </div>
-            <AlertDialogTitle>Delete Workspace</AlertDialogTitle>
-            <AlertDialogDescription className="space-y-2">
-              <p>
-                Are you sure you want to delete{" "}
-                <span className="font-semibold text-foreground">
-                  {workspaceToDelete?.name}
+          )}
+
+          {/* Shared With You Section */}
+          {workspaces.filter((w) => w.role !== "OWNER").length > 0 && (
+            <div className="space-y-4">
+              <div className="flex items-center gap-2">
+                <UsersRound className="h-5 w-5 text-blue-500" />
+                <h2 className="text-lg font-semibold">Shared With You</h2>
+                <span className="text-sm text-muted-foreground">
+                  ({workspaces.filter((w) => w.role !== "OWNER").length})
                 </span>
-                ?
-              </p>
-              <p className="text-destructive font-medium">
-                This action cannot be undone. All projects, tasks, and data
-                within this workspace will be permanently deleted.
-              </p>
-            </AlertDialogDescription>
-          </AlertDialogHeader>
-          <AlertDialogFooter>
-            <AlertDialogCancel disabled={isDeleting}>Cancel</AlertDialogCancel>
-            <AlertDialogAction
-              onClick={handleDeleteWorkspace}
-              disabled={isDeleting}
-              className="bg-destructive text-destructive-foreground hover:bg-destructive/90"
-            >
-              {isDeleting ? "Deleting..." : "Delete Workspace"}
-            </AlertDialogAction>
-          </AlertDialogFooter>
-        </AlertDialogContent>
-      </AlertDialog>
+              </div>
+              <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                {workspaces
+                  .filter((w) => w.role !== "OWNER")
+                  .map((workspace, index) => (
+                    <motion.div
+                      key={workspace.id}
+                      initial={{ opacity: 0, y: 20 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      transition={{ delay: index * 0.05 }}
+                    >
+                      <Card
+                        className="cursor-pointer transition-all duration-200 hover:shadow-lg hover:shadow-primary/5 hover:border-primary/30 hover:-translate-y-1"
+                        onClick={() =>
+                          router.push(`/workspace/${workspace.id}`)
+                        }
+                      >
+                        <CardHeader>
+                          <div className="flex items-start justify-between">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-blue-100">
+                              <Building2 className="h-5 w-5 text-blue-600" />
+                            </div>
+                            <div
+                              className={`flex items-center gap-1 text-xs px-2 py-1 rounded-full ${
+                                workspace.role === "ADMIN"
+                                  ? "text-purple-600 bg-purple-50"
+                                  : "text-blue-600 bg-blue-50"
+                              }`}
+                            >
+                              {workspace.role === "ADMIN" ? (
+                                <Shield className="h-3 w-3" />
+                              ) : (
+                                <Users className="h-3 w-3" />
+                              )}
+                              {workspace.role === "ADMIN" ? "Admin" : "Member"}
+                            </div>
+                          </div>
+                          <CardTitle className="mt-3">
+                            {workspace.name}
+                          </CardTitle>
+                          <CardDescription>
+                            Owned by {workspace.owner.name}
+                          </CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                          <div className="flex items-center justify-between">
+                            <div className="flex items-center gap-1 text-sm text-muted-foreground">
+                              <Users className="h-4 w-4" />
+                              <span>
+                                {workspace.memberCount} member
+                                {workspace.memberCount !== 1 ? "s" : ""}
+                              </span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    </motion.div>
+                  ))}
+              </div>
+            </div>
+          )}
+        </div>
+      )}
     </div>
   );
 }

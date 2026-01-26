@@ -2,15 +2,35 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { sendPasswordResetOTP, generateOTP } from "@/lib/email";
 import { randomUUID } from "crypto";
+import { forgotPasswordSchema } from "@/lib/validations";
+import {
+  checkRateLimit,
+  rateLimitResponse,
+  getClientIdentifier,
+  RATE_LIMITS,
+} from "@/lib/rate-limit";
+import { ApiErrors, handleZodError } from "@/lib/api-errors";
 
 export async function POST(request: NextRequest) {
   try {
-    const body = await request.json();
-    const { email } = body;
-
-    if (!email || typeof email !== "string") {
-      return NextResponse.json({ error: "Email is required" }, { status: 400 });
+    // Rate limiting for auth (10/min)
+    const clientId = getClientIdentifier(request);
+    const rateLimitResult = checkRateLimit(
+      `auth:forgot-password:${clientId}`,
+      RATE_LIMITS.AUTH,
+    );
+    if (!rateLimitResult.success) {
+      return rateLimitResponse(rateLimitResult);
     }
+
+    const body = await request.json();
+    const parseResult = forgotPasswordSchema.safeParse(body);
+
+    if (!parseResult.success) {
+      return handleZodError(parseResult.error);
+    }
+
+    const { email } = parseResult.data;
 
     // Find user by email
     const user = await prisma.user.findUnique({
@@ -93,9 +113,6 @@ export async function POST(request: NextRequest) {
     });
   } catch (error) {
     console.error("Forgot password error:", error);
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError();
   }
 }

@@ -2,8 +2,42 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { stripe } from "@/lib/stripe";
 import Stripe from "stripe";
+import { createNotification } from "@/lib/notifications";
+import { sendSubscriptionUpdatedEmail } from "@/lib/email";
+import { ApiErrors } from "@/lib/api-errors";
 
 const webhookSecret = process.env.STRIPE_WEBHOOK_SECRET;
+
+// In-memory idempotency cache for processed events (in production, use Redis)
+const processedEvents = new Map<string, number>();
+const EVENT_CACHE_TTL = 60 * 60 * 1000; // 1 hour
+
+function isEventProcessed(eventId: string): boolean {
+  const timestamp = processedEvents.get(eventId);
+  if (!timestamp) return false;
+
+  // Check if entry has expired
+  if (Date.now() - timestamp > EVENT_CACHE_TTL) {
+    processedEvents.delete(eventId);
+    return false;
+  }
+
+  return true;
+}
+
+function markEventProcessed(eventId: string): void {
+  processedEvents.set(eventId, Date.now());
+
+  // Cleanup old entries periodically
+  if (processedEvents.size > 1000) {
+    const now = Date.now();
+    for (const [id, timestamp] of processedEvents.entries()) {
+      if (now - timestamp > EVENT_CACHE_TTL) {
+        processedEvents.delete(id);
+      }
+    }
+  }
+}
 
 export async function POST(request: NextRequest) {
   try {
@@ -26,7 +60,7 @@ export async function POST(request: NextRequest) {
     const signature = request.headers.get("stripe-signature");
 
     if (!signature) {
-      return NextResponse.json({ error: "Missing signature" }, { status: 400 });
+      return ApiErrors.badRequest("Missing signature");
     }
 
     let event: Stripe.Event;
@@ -35,7 +69,13 @@ export async function POST(request: NextRequest) {
       event = stripe.webhooks.constructEvent(body, signature, webhookSecret);
     } catch (err) {
       console.error("Webhook signature verification failed:", err);
-      return NextResponse.json({ error: "Invalid signature" }, { status: 400 });
+      return ApiErrors.badRequest("Invalid signature");
+    }
+
+    // Idempotency check - prevent duplicate processing
+    if (isEventProcessed(event.id)) {
+      console.log(`Event ${event.id} already processed, skipping`);
+      return NextResponse.json({ received: true, duplicate: true });
     }
 
     switch (event.type) {
@@ -58,13 +98,13 @@ export async function POST(request: NextRequest) {
         console.log(`Unhandled event type: ${event.type}`);
     }
 
+    // Mark event as processed after successful handling
+    markEventProcessed(event.id);
+
     return NextResponse.json({ received: true });
   } catch (error) {
     console.error("Webhook error:", error);
-    return NextResponse.json(
-      { error: "Webhook handler failed" },
-      { status: 500 },
-    );
+    return ApiErrors.internalError("Webhook handler failed");
   }
 }
 
@@ -124,6 +164,30 @@ async function handleCheckoutCompleted(session: Stripe.Checkout.Session) {
     where: { id: userId },
     data: { tier: plan },
   });
+
+  // Get user details for notification and email
+  const user = await prisma.user.findUnique({
+    where: { id: userId },
+    select: { name: true, email: true },
+  });
+
+  // Create in-app notification
+  await createNotification({
+    userId,
+    title: "Subscription Activated",
+    message: `Welcome to the ${plan} plan! Enjoy your enhanced features.`,
+    type: "SUCCESS",
+  });
+
+  // Send email notification
+  if (user?.email) {
+    await sendSubscriptionUpdatedEmail(
+      user.email,
+      user.name,
+      plan,
+      "activated",
+    );
+  }
 }
 
 async function handleSubscriptionUpdated(subscription: Stripe.Subscription) {
@@ -192,6 +256,31 @@ async function handleSubscriptionDeleted(subscription: Stripe.Subscription) {
     where: { id: existingSubscription.userId },
     data: { tier: "FREE" },
   });
+
+  // Get user details for notification and email
+  const user = await prisma.user.findUnique({
+    where: { id: existingSubscription.userId },
+    select: { name: true, email: true },
+  });
+
+  // Create in-app notification
+  await createNotification({
+    userId: existingSubscription.userId,
+    title: "Subscription Canceled",
+    message:
+      "Your subscription has been canceled. You've been moved to the FREE plan.",
+    type: "WARNING",
+  });
+
+  // Send email notification
+  if (user?.email) {
+    await sendSubscriptionUpdatedEmail(
+      user.email,
+      user.name,
+      "FREE",
+      "canceled",
+    );
+  }
 }
 
 function mapStripeStatus(status: Stripe.Subscription.Status): string {

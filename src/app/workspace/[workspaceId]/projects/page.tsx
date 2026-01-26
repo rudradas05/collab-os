@@ -7,7 +7,6 @@ import { toast } from "sonner";
 import {
   Plus,
   FolderKanban,
-  MoreVertical,
   Trash2,
   Calendar,
   CheckSquare,
@@ -23,12 +22,6 @@ import {
   DialogTitle,
   DialogTrigger,
 } from "@/components/ui/dialog";
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from "@/components/ui/dropdown-menu";
 import {
   AlertDialog,
   AlertDialogAction,
@@ -57,6 +50,9 @@ export default function ProjectsPage() {
   const workspaceId = params.workspaceId as string;
 
   const [projects, setProjects] = useState<Project[]>([]);
+  const [userRole, setUserRole] = useState<"OWNER" | "ADMIN" | "MEMBER" | null>(
+    null,
+  );
   const [isLoading, setIsLoading] = useState(true);
   const [isCreateOpen, setIsCreateOpen] = useState(false);
   const [isCreating, setIsCreating] = useState(false);
@@ -65,6 +61,9 @@ export default function ProjectsPage() {
     name: "",
     description: "",
   });
+
+  const canDelete = userRole === "OWNER" || userRole === "ADMIN";
+  const canCreate = userRole === "OWNER" || userRole === "ADMIN";
 
   const fetchProjects = useCallback(async () => {
     try {
@@ -81,9 +80,23 @@ export default function ProjectsPage() {
     }
   }, [workspaceId]);
 
+  const fetchUserRole = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/workspaces/${workspaceId}`);
+      const data = await response.json();
+
+      if (response.ok) {
+        setUserRole(data.userRole);
+      }
+    } catch (error) {
+      console.error("Failed to fetch user role:", error);
+    }
+  }, [workspaceId]);
+
   useEffect(() => {
     fetchProjects();
-  }, [fetchProjects]);
+    fetchUserRole();
+  }, [fetchProjects, fetchUserRole]);
 
   const handleCreate = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -98,7 +111,9 @@ export default function ProjectsPage() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           name: formData.name.trim(),
-          description: formData.description.trim() || null,
+          ...(formData.description.trim() && {
+            description: formData.description.trim(),
+          }),
           workspaceId,
         }),
       });
@@ -183,65 +198,67 @@ export default function ProjectsPage() {
           </p>
         </div>
 
-        <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
-          <DialogTrigger asChild>
-            <Button className="gap-2">
-              <Plus className="h-4 w-4" />
-              New Project
-            </Button>
-          </DialogTrigger>
-          <DialogContent>
-            <DialogHeader>
-              <DialogTitle>Create New Project</DialogTitle>
-              <DialogDescription>
-                Add a new project to organize your tasks.
-              </DialogDescription>
-            </DialogHeader>
-            <form onSubmit={handleCreate} className="space-y-4 pt-4">
-              <div className="space-y-2">
-                <Label htmlFor="name">Project Name</Label>
-                <Input
-                  id="name"
-                  placeholder="Enter project name"
-                  value={formData.name}
-                  onChange={(e) =>
-                    setFormData({ ...formData, name: e.target.value })
-                  }
-                  disabled={isCreating}
-                  autoFocus
-                />
-              </div>
-              <div className="space-y-2">
-                <Label htmlFor="description">Description (optional)</Label>
-                <Input
-                  id="description"
-                  placeholder="Brief description of the project"
-                  value={formData.description}
-                  onChange={(e) =>
-                    setFormData({ ...formData, description: e.target.value })
-                  }
-                  disabled={isCreating}
-                />
-              </div>
-              <div className="flex justify-end gap-3 pt-2">
-                <Button
-                  type="button"
-                  variant="outline"
-                  onClick={() => setIsCreateOpen(false)}
-                  disabled={isCreating}
-                >
-                  Cancel
-                </Button>
-                <Button
-                  type="submit"
-                  disabled={isCreating || !formData.name.trim()}
-                >
-                  Create Project
-                </Button>
-              </div>
-            </form>
-          </DialogContent>
-        </Dialog>
+        {canCreate && (
+          <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
+            <DialogTrigger asChild>
+              <Button className="gap-2">
+                <Plus className="h-4 w-4" />
+                New Project
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Create New Project</DialogTitle>
+                <DialogDescription>
+                  Add a new project to organize your tasks.
+                </DialogDescription>
+              </DialogHeader>
+              <form onSubmit={handleCreate} className="space-y-4 pt-4">
+                <div className="space-y-2">
+                  <Label htmlFor="name">Project Name</Label>
+                  <Input
+                    id="name"
+                    placeholder="Enter project name"
+                    value={formData.name}
+                    onChange={(e) =>
+                      setFormData({ ...formData, name: e.target.value })
+                    }
+                    disabled={isCreating}
+                    autoFocus
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label htmlFor="description">Description (optional)</Label>
+                  <Input
+                    id="description"
+                    placeholder="Brief description of the project"
+                    value={formData.description}
+                    onChange={(e) =>
+                      setFormData({ ...formData, description: e.target.value })
+                    }
+                    disabled={isCreating}
+                  />
+                </div>
+                <div className="flex justify-end gap-3 pt-2">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setIsCreateOpen(false)}
+                    disabled={isCreating}
+                  >
+                    Cancel
+                  </Button>
+                  <Button
+                    type="submit"
+                    disabled={isCreating || !formData.name.trim()}
+                  >
+                    Create Project
+                  </Button>
+                </div>
+              </form>
+            </DialogContent>
+          </Dialog>
+        )}
       </div>
 
       {/* Projects Grid */}
@@ -258,13 +275,16 @@ export default function ProjectsPage() {
             No projects yet
           </h3>
           <p className="text-muted-foreground mb-6 max-w-sm">
-            Create your first project to start organizing tasks and tracking
-            progress.
+            {canCreate
+              ? "Create your first project to start organizing tasks and tracking progress."
+              : "No projects have been created yet. Ask an owner or admin to create a project."}
           </p>
-          <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
-            <Plus className="h-4 w-4" />
-            Create Your First Project
-          </Button>
+          {canCreate && (
+            <Button onClick={() => setIsCreateOpen(true)} className="gap-2">
+              <Plus className="h-4 w-4" />
+              Create Your First Project
+            </Button>
+          )}
         </motion.div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
@@ -286,30 +306,20 @@ export default function ProjectsPage() {
                       <div className="h-10 w-10 rounded-lg bg-primary/10 flex items-center justify-center">
                         <FolderKanban className="h-5 w-5 text-primary" />
                       </div>
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button
-                            variant="ghost"
-                            size="icon"
-                            className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity"
-                            onClick={(e) => e.preventDefault()}
-                          >
-                            <MoreVertical className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem
-                            className="text-destructive focus:text-destructive"
-                            onClick={(e) => {
-                              e.preventDefault();
-                              setDeleteProject(project);
-                            }}
-                          >
-                            <Trash2 className="h-4 w-4 mr-2" />
-                            Delete
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
+                      {canDelete && (
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          className="h-8 w-8 text-muted-foreground hover:text-destructive hover:bg-destructive/10"
+                          onClick={(e) => {
+                            e.preventDefault();
+                            setDeleteProject(project);
+                          }}
+                          title="Delete project"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      )}
                     </div>
 
                     <h3 className="font-semibold text-foreground mb-1 group-hover:text-primary transition-colors">
@@ -347,10 +357,20 @@ export default function ProjectsPage() {
         <AlertDialogContent>
           <AlertDialogHeader>
             <AlertDialogTitle>Delete Project</AlertDialogTitle>
-            <AlertDialogDescription>
-              Are you sure you want to delete &quot;{deleteProject?.name}&quot;?
-              This will also delete all tasks in this project. This action
-              cannot be undone.
+            <AlertDialogDescription asChild>
+              <div className="space-y-2">
+                <span className="block">
+                  Are you sure you want to delete{" "}
+                  <span className="font-semibold text-foreground">
+                    {deleteProject?.name}
+                  </span>
+                  ?
+                </span>
+                <span className="block text-destructive font-medium">
+                  This will also delete all tasks in this project. This action
+                  cannot be undone.
+                </span>
+              </div>
             </AlertDialogDescription>
           </AlertDialogHeader>
           <AlertDialogFooter>
