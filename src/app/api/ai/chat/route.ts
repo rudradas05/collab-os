@@ -28,6 +28,33 @@ const TIER_DAILY_LIMITS: Record<Tier, number> = {
 
 
 
+function buildSystemPrompt(context: {
+  today: string;
+  userName: string | null;
+  workspace: {
+    id: string;
+    name: string | null;
+    projectCount: number;
+    taskCount: number;
+    openTaskCount: number;
+    recentProjects: string[];
+    openTasks: { title: string; projectName: string | null }[];
+  };
+}): string {
+  return [
+    "You are CollabOS AI Assistant.",
+    "Use ONLY the provided context for workspace-specific questions.",
+    "If a user asks for workspace details not present in context, say you don't have that data and ask a clarifying question.",
+    "For date/time questions, use the provided 'today' value.",
+    "If the user asks for pending/open tasks, list the task titles from context.",
+    "",
+    "Context:",
+    "```json",
+    JSON.stringify(context, null, 2),
+    "```",
+  ].join("\n");
+}
+
 async function callGemini(prompt: string): Promise<string> {
   try {
     const model = genAI.getGenerativeModel({
@@ -94,6 +121,69 @@ export async function POST(request: NextRequest) {
     if (!membership) {
       return ApiErrors.forbidden("You are not a member of this workspace");
     }
+
+    const today = new Date().toDateString();
+
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: workspaceId },
+      select: { id: true, name: true },
+    });
+
+    if (!workspace) {
+      return ApiErrors.notFound("Workspace");
+    }
+
+    const [projectCount, taskCount, openTaskCount, recentProjects, openTasks] =
+      await prisma.$transaction([
+        prisma.project.count({ where: { workspaceId } }),
+        prisma.task.count({
+          where: { project: { workspaceId } },
+        }),
+        prisma.task.count({
+          where: {
+            project: { workspaceId },
+            status: { in: ["TODO", "IN_PROGRESS"] },
+          },
+        }),
+        prisma.project.findMany({
+          where: { workspaceId },
+          orderBy: { createdAt: "desc" },
+          take: 5,
+          select: { name: true },
+        }),
+        prisma.task.findMany({
+          where: {
+            project: { workspaceId },
+            status: { in: ["TODO", "IN_PROGRESS"] },
+            assignedTo: user.id,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+          select: {
+            title: true,
+            project: { select: { name: true } },
+          },
+        }),
+      ]);
+
+    const systemPrompt = buildSystemPrompt({
+      today,
+      userName: user.name ?? null,
+      workspace: {
+        id: workspace.id,
+        name: workspace.name ?? null,
+        projectCount,
+        taskCount,
+        openTaskCount,
+        recentProjects: recentProjects.map((p) => p.name),
+        openTasks: openTasks.map((task) => ({
+          title: task.title,
+          projectName: task.project?.name ?? null,
+        })),
+      },
+    });
+
+    const fullPrompt = `${systemPrompt}\n\nUser: ${message.trim()}`;
 
     // Get user's current data
     const userData = await prisma.user.findUnique({
@@ -162,7 +252,7 @@ export async function POST(request: NextRequest) {
     // Call Gemini API
     let aiResponse: string;
     try {
-      aiResponse = await callGemini(message.trim());
+      aiResponse = await callGemini(fullPrompt);
     } catch (error) {
       // Refund coins if AI call fails
       await addCoins(
