@@ -175,8 +175,15 @@ function BillingContent() {
     }
   };
 
-  const currentPlan = (data?.subscription?.plan as Plan) || "FREE";
+  const tier = (data?.tier as Plan) || "FREE";
+  const currentPlan = tier;
   const coins = data?.coins ?? 0;
+  const currentPeriodEnd = data?.subscription?.currentPeriodEnd
+    ? new Date(data.subscription.currentPeriodEnd)
+    : null;
+  const isExpired =
+    data?.subscription?.status === "expired" ||
+    (!!currentPeriodEnd && currentPeriodEnd.getTime() < Date.now());
 
   // Plan order for comparison
   const PLAN_ORDER: Plan[] = ["FREE", "PRO", "ELITE", "LEGEND"];
@@ -224,17 +231,15 @@ function BillingContent() {
                     ? "Basic features for getting started"
                     : data?.subscription?.status === "active"
                       ? "Active subscription"
-                      : `Status: ${data?.subscription?.status}`}
+                      : `Status: ${data?.subscription?.status || "unknown"}`}
                 </p>
               </div>
-              {data?.subscription?.currentPeriodEnd && (
+              {currentPeriodEnd && (
                 <>
                   <Separator />
                   <p className="text-sm text-muted-foreground">
-                    Renews on{" "}
-                    {new Date(
-                      data.subscription.currentPeriodEnd,
-                    ).toLocaleDateString()}
+                    {isExpired ? "Ended on " : "Renews on "}
+                    {currentPeriodEnd.toLocaleDateString()}
                   </p>
                 </>
               )}

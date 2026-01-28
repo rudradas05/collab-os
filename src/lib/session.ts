@@ -2,6 +2,7 @@ import { cookies } from "next/headers";
 import { prisma } from "@/lib/prisma";
 import { verifyToken } from "@/lib/auth";
 import { Role } from "@/generated/prisma";
+import { reconcileUserSubscription } from "@/lib/subscription";
 
 export interface CurrentUser {
   id: string;
@@ -24,6 +25,8 @@ export async function getCurrentUser(): Promise<CurrentUser | null> {
   if (!payload) {
     return null;
   }
+
+  await reconcileUserSubscription(payload.userId);
 
   const user = await prisma.user.findUnique({
     where: { id: payload.userId },

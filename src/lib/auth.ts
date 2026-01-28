@@ -4,6 +4,7 @@ import { serialize, parse } from "cookie";
 import { Role } from "@/generated/prisma";
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { reconcileUserSubscription } from "@/lib/subscription";
 
 const JWT_SECRET = process.env.JWT_SECRET!;
 const COOKIE_NAME = "collabos_token";
@@ -83,6 +84,8 @@ export async function getCurrentUser(request: NextRequest) {
   const payload = verifyToken(token);
   if (!payload) return null;
 
+  await reconcileUserSubscription(payload.userId);
+
   const user = await prisma.user.findUnique({
     where: { id: payload.userId },
     select: {
@@ -140,6 +143,8 @@ export async function requireAuth(
       error: unauthorizedResponse("Invalid or expired token"),
     };
   }
+
+  await reconcileUserSubscription(payload.userId);
 
   const user = await prisma.user.findUnique({
     where: { id: payload.userId },

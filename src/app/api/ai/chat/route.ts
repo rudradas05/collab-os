@@ -19,8 +19,6 @@ const AI_COST = 2;
 
 const genAI = new GoogleGenerativeAI(process.env.GEMINI_API_KEY!);
 
-console.log("GEMINI KEY OK:", !!process.env.GEMINI_API_KEY);
-
 const TIER_DAILY_LIMITS: Record<Tier, number> = {
   FREE: 5,
   PRO: 50,
