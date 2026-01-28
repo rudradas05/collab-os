@@ -12,7 +12,6 @@ import {
 import { motion } from "motion/react";
 import { cn } from "@/lib/utils";
 import { Switch } from "@/components/ui/switch";
-import { Button } from "@/components/ui/button";
 import {
   Card,
   CardContent,
@@ -23,15 +22,10 @@ import {
 
 interface AutomationInfo {
   type: "TASK_DONE" | "DEADLINE" | "PROJECT_CREATED";
-  name: string;
+  title: string;
   description: string;
   enabled: boolean;
   id: string | null;
-}
-
-interface WorkspaceMember {
-  userId: string;
-  role: "OWNER" | "ADMIN" | "MEMBER";
 }
 
 const automationIcons = {
@@ -60,6 +54,7 @@ export default function AutomationsPage({
       const data = await response.json();
       if (response.ok) {
         setAutomations(data.automations || []);
+        setIsOwner(data.isOwner ?? false);
       }
     } catch (error) {
       console.error("Failed to fetch automations:", error);
@@ -68,33 +63,9 @@ export default function AutomationsPage({
     }
   }, [workspaceId]);
 
-  const checkOwnership = useCallback(async () => {
-    try {
-      const response = await fetch(`/api/workspaces/${workspaceId}/members`);
-      const data = await response.json();
-      if (response.ok) {
-        const currentMember = data.members?.find(
-          (m: WorkspaceMember) => m.role === "OWNER",
-        );
-        // Check if current user is owner by fetching user info
-        const userResponse = await fetch("/api/auth/user");
-        const userData = await userResponse.json();
-        if (userResponse.ok && userData.user) {
-          const userMember = data.members?.find(
-            (m: { userId: string }) => m.userId === userData.user.id,
-          );
-          setIsOwner(userMember?.role === "OWNER");
-        }
-      }
-    } catch (error) {
-      console.error("Failed to check ownership:", error);
-    }
-  }, [workspaceId]);
-
   useEffect(() => {
     fetchAutomations();
-    checkOwnership();
-  }, [fetchAutomations, checkOwnership]);
+  }, [fetchAutomations]);
 
   const handleToggle = async (automation: AutomationInfo) => {
     if (!isOwner) return;
@@ -200,7 +171,8 @@ export default function AutomationsPage({
         {automations.map((automation, index) => {
           const Icon = automationIcons[automation.type];
           const isProcessing =
-            togglingId === automation.id || creatingType === automation.type;
+            (togglingId !== null && togglingId === automation.id) ||
+            creatingType === automation.type;
 
           return (
             <motion.div
@@ -239,7 +211,7 @@ export default function AutomationsPage({
                     </div>
                   </div>
                   <CardTitle className="text-lg mt-3">
-                    {automation.name}
+                    {automation.title}
                   </CardTitle>
                 </CardHeader>
                 <CardContent>
