@@ -19,7 +19,23 @@ export async function isAutomationEnabled(
     },
   });
 
-  return automation?.enabled ?? false;
+  if (automation) {
+    return automation.enabled;
+  }
+
+  // If missing, default to enabled and persist so existing workspaces get notifications
+  try {
+    await prisma.automation.create({
+      data: {
+        workspaceId,
+        type,
+        enabled: true,
+      },
+    });
+    return true;
+  } catch {
+    return false;
+  }
 }
 
 /**

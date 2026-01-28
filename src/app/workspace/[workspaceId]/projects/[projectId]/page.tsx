@@ -14,6 +14,8 @@ import {
   Coins,
   GripVertical,
   Flag,
+  Calendar,
+  User as UserIcon,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -63,6 +65,16 @@ interface Project {
   id: string;
   name: string;
   description: string | null;
+}
+
+type WorkspaceRole = "OWNER" | "ADMIN" | "MEMBER";
+
+interface WorkspaceMember {
+  userId: string;
+  name: string;
+  email: string;
+  avatar: string | null;
+  role: WorkspaceRole;
 }
 
 const STATUS_CONFIG: Record<
@@ -128,6 +140,10 @@ export default function ProjectTasksPage() {
   const [deleteTask, setDeleteTask] = useState<Task | null>(null);
   const [taskTitle, setTaskTitle] = useState("");
   const [taskPriority, setTaskPriority] = useState<TaskPriority>("MEDIUM");
+  const [assignedTo, setAssignedTo] = useState<string>("");
+  const [dueDate, setDueDate] = useState<string>("");
+  const [members, setMembers] = useState<WorkspaceMember[]>([]);
+  const [userRole, setUserRole] = useState<WorkspaceRole>("MEMBER");
 
   const fetchProject = useCallback(async () => {
     try {
@@ -164,10 +180,25 @@ export default function ProjectTasksPage() {
     }
   }, [projectId]);
 
+  const fetchWorkspaceMembers = useCallback(async () => {
+    try {
+      const response = await fetch(`/api/workspaces/${workspaceId}`);
+      const data = await response.json();
+
+      if (response.ok) {
+        setMembers(data.members || []);
+        setUserRole(data.userRole || "MEMBER");
+      }
+    } catch (error) {
+      console.error("Failed to fetch workspace members:", error);
+    }
+  }, [workspaceId]);
+
   useEffect(() => {
     fetchProject();
     fetchTasks();
-  }, [fetchProject, fetchTasks]);
+    fetchWorkspaceMembers();
+  }, [fetchProject, fetchTasks, fetchWorkspaceMembers]);
 
   const handleCreateTask = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -184,6 +215,8 @@ export default function ProjectTasksPage() {
           title: taskTitle.trim(),
           projectId,
           priority: taskPriority,
+          assignedTo: assignedTo || null,
+          dueDate: dueDate ? new Date(dueDate).toISOString() : null,
         }),
       });
 
@@ -203,6 +236,8 @@ export default function ProjectTasksPage() {
       setTasks((prev) => [data.task, ...prev]);
       setTaskTitle("");
       setTaskPriority("MEDIUM");
+      setAssignedTo("");
+      setDueDate("");
       setIsCreateOpen(false);
     } catch {
       toast.dismiss(loadingToast);
@@ -294,6 +329,8 @@ export default function ProjectTasksPage() {
   const getTasksByStatus = (status: TaskStatus) =>
     tasks.filter((task) => task.status === status);
 
+  const canManageTasks = userRole === "OWNER" || userRole === "ADMIN";
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-64">
@@ -326,7 +363,7 @@ export default function ProjectTasksPage() {
 
         <Dialog open={isCreateOpen} onOpenChange={setIsCreateOpen}>
           <DialogTrigger asChild>
-            <Button className="gap-2">
+            <Button className="gap-2" disabled={!canManageTasks}>
               <Plus className="h-4 w-4" />
               Add Task
             </Button>
@@ -348,6 +385,38 @@ export default function ProjectTasksPage() {
                   onChange={(e) => setTaskTitle(e.target.value)}
                   disabled={isCreating}
                   autoFocus
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="assignee">Assign To</Label>
+                <select
+                  id="assignee"
+                  value={assignedTo}
+                  onChange={(e) => setAssignedTo(e.target.value)}
+                  className="h-10 w-full rounded-md border border-input bg-background px-3 text-sm"
+                  disabled={isCreating || !canManageTasks}
+                >
+                  <option value="">Unassigned</option>
+                  {members.map((member) => (
+                    <option key={member.userId} value={member.userId}>
+                      {member.name} ({member.role})
+                    </option>
+                  ))}
+                </select>
+                {!canManageTasks && (
+                  <p className="text-xs text-muted-foreground">
+                    Only owners and admins can assign tasks.
+                  </p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="dueDate">Due Date</Label>
+                <Input
+                  id="dueDate"
+                  type="date"
+                  value={dueDate}
+                  onChange={(e) => setDueDate(e.target.value)}
+                  disabled={isCreating}
                 />
               </div>
               <div className="space-y-2">
@@ -384,7 +453,7 @@ export default function ProjectTasksPage() {
                 </Button>
                 <Button
                   type="submit"
-                  disabled={isCreating || !taskTitle.trim()}
+                  disabled={isCreating || !taskTitle.trim() || !canManageTasks}
                 >
                   Create Task
                 </Button>
@@ -471,6 +540,20 @@ export default function ProjectTasksPage() {
                                       : "Done"}
                                 </button>
                               ))}
+                            </div>
+                            <div className="mt-2 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
+                              <span className="inline-flex items-center gap-1">
+                                <UserIcon className="h-3 w-3" />
+                                {task.assignee
+                                  ? task.assignee.name
+                                  : "Unassigned"}
+                              </span>
+                              <span className="inline-flex items-center gap-1">
+                                <Calendar className="h-3 w-3" />
+                                {task.dueDate
+                                  ? new Date(task.dueDate).toLocaleDateString()
+                                  : "No due date"}
+                              </span>
                             </div>
                           </div>
                           <Button

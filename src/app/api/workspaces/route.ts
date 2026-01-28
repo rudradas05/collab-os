@@ -18,6 +18,12 @@ import {
 } from "@/lib/rate-limit";
 import { ApiErrors, handleZodError } from "@/lib/api-errors";
 
+const DEFAULT_AUTOMATIONS = [
+  "TASK_DONE",
+  "DEADLINE",
+  "PROJECT_CREATED",
+] as const;
+
 export async function POST(request: NextRequest) {
   try {
     // Rate limiting for workspace creation
@@ -97,6 +103,16 @@ export async function POST(request: NextRequest) {
           workspaceId: newWorkspace.id,
           role: WorkspaceRole.OWNER,
         },
+      });
+
+      // Seed default automations as enabled
+      await tx.automation.createMany({
+        data: DEFAULT_AUTOMATIONS.map((type) => ({
+          workspaceId: newWorkspace.id,
+          type,
+          enabled: true,
+        })),
+        skipDuplicates: true,
       });
 
       return newWorkspace;

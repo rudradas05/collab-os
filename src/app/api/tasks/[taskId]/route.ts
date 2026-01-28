@@ -85,6 +85,7 @@ export async function PATCH(
       updateData.title = title.trim();
     }
 
+    let assignedToChanged = false;
     if (assignedTo !== undefined) {
       if (assignedTo) {
         const assigneeMembership = await prisma.workspaceMember.findUnique({
@@ -99,8 +100,15 @@ export async function PATCH(
         if (!assigneeMembership) {
           return ApiErrors.badRequest("Assignee must be a workspace member");
         }
+
+        if (assigneeMembership.role === "OWNER") {
+          return ApiErrors.forbidden(
+            "You cannot assign tasks to the workspace owner",
+          );
+        }
       }
       updateData.assignedTo = assignedTo || null;
+      assignedToChanged = assignedTo !== existingTask.assignedTo;
     }
 
     if (priority !== undefined) {
@@ -172,6 +180,15 @@ export async function PATCH(
       },
     });
 
+    if (assignedToChanged && task.assignedTo && task.assignedTo !== user.id) {
+      await createNotification({
+        userId: task.assignedTo,
+        title: "Task Assigned",
+        message: `You were assigned a task "${task.title}".`,
+        type: "INFO",
+      });
+    }
+
     return NextResponse.json({
       task,
       coinAwarded,
@@ -220,6 +237,10 @@ export async function DELETE(
 
     if (!membership) {
       return ApiErrors.forbidden("You are not a member of this workspace");
+    }
+
+    if (!["OWNER", "ADMIN"].includes(membership.role)) {
+      return ApiErrors.forbidden("Only workspace owners or admins can delete tasks");
     }
 
     await prisma.task.delete({

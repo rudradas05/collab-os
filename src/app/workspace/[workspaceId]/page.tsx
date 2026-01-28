@@ -337,37 +337,40 @@ export default async function WorkspacePage({
                 </p>
               ) : (
                 myTasks.map((task) => (
-                  <div
+                  <Link
                     key={task.id}
-                    className="flex flex-col gap-1 p-3 rounded-lg border hover:bg-muted/50 transition-colors"
+                    href={`/workspace/${workspace.id}/projects/${task.projectId}`}
+                    className="block"
                   >
-                    <p className="font-medium text-sm line-clamp-1">
-                      {task.title}
-                    </p>
-                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
-                      <span
-                        className={cn(
-                          "uppercase font-medium",
-                          task.status === "DONE" && "text-emerald-600",
-                          task.status === "IN_PROGRESS" && "text-amber-600",
-                          task.status === "TODO" && "text-muted-foreground",
-                        )}
-                      >
-                        {task.status.replace("_", " ")}
-                      </span>
-                      <span>•</span>
-                      <span
-                        className={cn(
-                          "font-medium",
-                          task.priority === "HIGH" && "text-red-600",
-                          task.priority === "MEDIUM" && "text-amber-600",
-                          task.priority === "LOW" && "text-emerald-600",
-                        )}
-                      >
-                        {task.priority} Priority
-                      </span>
+                    <div className="flex flex-col gap-1 p-3 rounded-lg border hover:bg-muted/50 transition-colors">
+                      <p className="font-medium text-sm line-clamp-1">
+                        {task.title}
+                      </p>
+                      <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                        <span
+                          className={cn(
+                            "uppercase font-medium",
+                            task.status === "DONE" && "text-emerald-600",
+                            task.status === "IN_PROGRESS" && "text-amber-600",
+                            task.status === "TODO" && "text-muted-foreground",
+                          )}
+                        >
+                          {task.status.replace("_", " ")}
+                        </span>
+                        <span>•</span>
+                        <span
+                          className={cn(
+                            "font-medium",
+                            task.priority === "HIGH" && "text-red-600",
+                            task.priority === "MEDIUM" && "text-amber-600",
+                            task.priority === "LOW" && "text-emerald-600",
+                          )}
+                        >
+                          {task.priority} Priority
+                        </span>
+                      </div>
                     </div>
-                  </div>
+                  </Link>
                 ))
               )}
             </CardContent>

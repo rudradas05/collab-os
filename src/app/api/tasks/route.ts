@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { getCurrentUser } from "@/lib/auth";
 import { createTaskSchema } from "@/lib/validations";
+import { createNotification } from "@/lib/notifications";
 import {
   requireWorkspaceMember,
   requireWorkspaceAdminOrOwner,
@@ -131,6 +132,10 @@ export async function POST(request: NextRequest) {
       if (!assigneeMembership) {
         return ApiErrors.badRequest("Assignee must be a workspace member");
       }
+
+      if (assigneeMembership.role === "OWNER") {
+        return ApiErrors.forbidden("You cannot assign tasks to the workspace owner");
+      }
     }
 
     const task = await prisma.task.create({
@@ -152,6 +157,15 @@ export async function POST(request: NextRequest) {
         },
       },
     });
+
+    if (assignedTo && assignedTo !== user.id) {
+      await createNotification({
+        userId: assignedTo,
+        title: "New Task Assigned",
+        message: `You were assigned a task "${task.title}".`,
+        type: "INFO",
+      });
+    }
 
     return NextResponse.json({ task }, { status: 201 });
   } catch (error) {
