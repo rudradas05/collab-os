@@ -50,6 +50,9 @@ export default function AIChatPage() {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLInputElement>(null);
 
+  const isUnlimited = dailyLimit === -1;
+  const hasRemaining = isUnlimited || remainingToday > 0;
+
   const scrollToBottom = () => {
     messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
   };
@@ -92,7 +95,7 @@ export default function AIChatPage() {
       return;
     }
 
-    if (remainingToday <= 0) {
+    if (!isUnlimited && remainingToday <= 0) {
       toast.error(
         `Daily limit reached. ${tier} tier allows ${dailyLimit} prompts per day.`,
       );
@@ -158,7 +161,7 @@ export default function AIChatPage() {
   };
 
   const canSend =
-    coins >= AI_COST && remainingToday > 0 && !isLoading && input.trim();
+    coins >= AI_COST && hasRemaining && !isLoading && input.trim();
 
   if (isInitialLoading) {
     return (
@@ -197,9 +200,11 @@ export default function AIChatPage() {
           <Card className="border-0 shadow-none bg-muted/50">
             <CardContent className="flex items-center gap-2 p-3">
               <span className="text-sm">
-                <span className="font-semibold">{remainingToday}</span>
+                <span className="font-semibold">
+                  {isUnlimited ? "∞" : remainingToday}
+                </span>
                 <span className="text-muted-foreground">
-                  /{dailyLimit === Infinity ? "∞" : dailyLimit}
+                  /{isUnlimited ? "∞" : dailyLimit}
                 </span>
               </span>
               <span className="text-sm text-muted-foreground">today</span>
@@ -209,7 +214,7 @@ export default function AIChatPage() {
       </div>
 
       {/* Warnings */}
-      {(coins < AI_COST || remainingToday <= 0) && (
+      {(coins < AI_COST || (!isUnlimited && remainingToday <= 0)) && (
         <motion.div
           initial={{ opacity: 0, y: -10 }}
           animate={{ opacity: 1, y: 0 }}
@@ -333,11 +338,13 @@ export default function AIChatPage() {
           placeholder={
             coins < AI_COST
               ? "Insufficient coins..."
-              : remainingToday <= 0
+              : !isUnlimited && remainingToday <= 0
                 ? "Daily limit reached..."
                 : "Type your message..."
           }
-          disabled={isLoading || coins < AI_COST || remainingToday <= 0}
+          disabled={
+            isLoading || coins < AI_COST || (!isUnlimited && remainingToday <= 0)
+          }
           className="flex-1"
         />
         <Button type="submit" disabled={!canSend} className="gap-2">

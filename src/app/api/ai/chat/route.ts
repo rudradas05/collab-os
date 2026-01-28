@@ -23,7 +23,7 @@ const TIER_DAILY_LIMITS: Record<Tier, number> = {
   FREE: 5,
   PRO: 50,
   ELITE: 200,
-  LEGEND: Infinity,
+  LEGEND: -1,
 };
 
 
@@ -107,6 +107,7 @@ export async function POST(request: NextRequest) {
 
     const userTier = (userData.tier as Tier) || "FREE";
     const dailyLimit = TIER_DAILY_LIMITS[userTier];
+    const isUnlimited = dailyLimit === -1;
 
     // Check daily AI usage count
     const startOfDay = new Date();
@@ -122,7 +123,7 @@ export async function POST(request: NextRequest) {
       },
     });
 
-    if (todayUsage >= dailyLimit) {
+    if (!isUnlimited && todayUsage >= dailyLimit) {
       return NextResponse.json(
         {
           error: `Daily limit reached. ${userTier} tier allows ${dailyLimit} AI prompts per day.`,
@@ -225,7 +226,9 @@ export async function POST(request: NextRequest) {
       },
       coinsSpent: AI_COST,
       newBalance: coinResult.newBalance,
-      remainingToday: dailyLimit - todayUsage - 1,
+      remainingToday: isUnlimited
+        ? -1
+        : Math.max(0, dailyLimit - todayUsage - 1),
     });
   } catch (error) {
     console.error("AI chat error:", error);
@@ -284,6 +287,7 @@ export async function GET(request: NextRequest) {
 
     const userTier = (userData?.tier as Tier) || "FREE";
     const dailyLimit = TIER_DAILY_LIMITS[userTier];
+    const isUnlimited = dailyLimit === -1;
 
     // Check daily usage
     const startOfDay = new Date();
@@ -305,7 +309,7 @@ export async function GET(request: NextRequest) {
       tier: userTier,
       dailyLimit,
       usedToday: todayUsage,
-      remainingToday: Math.max(0, dailyLimit - todayUsage),
+      remainingToday: isUnlimited ? -1 : Math.max(0, dailyLimit - todayUsage),
     });
   } catch (error) {
     console.error("Get AI messages error:", error);
