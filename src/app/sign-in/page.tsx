@@ -38,6 +38,7 @@ export default function SignInPage() {
         toast.error("Sign in failed", {
           description: data.error || "Invalid email or password.",
         });
+        setIsLoading(false);
         return;
       }
 
@@ -52,7 +53,6 @@ export default function SignInPage() {
       toast.error("Something went wrong", {
         description: "Please try again later.",
       });
-    } finally {
       setIsLoading(false);
     }
   };
@@ -75,6 +75,7 @@ export default function SignInPage() {
         toast.error("Google sign-in failed", {
           description: data.error || "Please try again.",
         });
+        setIsLoading(false);
         return;
       }
 
@@ -89,7 +90,6 @@ export default function SignInPage() {
       toast.error("Google sign-in failed", {
         description: "Please try again later.",
       });
-    } finally {
       setIsLoading(false);
     }
   };

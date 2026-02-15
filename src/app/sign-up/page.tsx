@@ -47,6 +47,7 @@ export default function SignUpPage() {
         toast.error("Sign up failed", {
           description: data.error || "Please check your information.",
         });
+        setIsLoading(false);
         return;
       }
 
@@ -61,7 +62,6 @@ export default function SignUpPage() {
       toast.error("Something went wrong", {
         description: "Please try again later.",
       });
-    } finally {
       setIsLoading(false);
     }
   };
@@ -84,6 +84,7 @@ export default function SignUpPage() {
         toast.error("Google sign-up failed", {
           description: data.error || "Please try again.",
         });
+        setIsLoading(false);
         return;
       }
 
@@ -98,7 +99,6 @@ export default function SignUpPage() {
       toast.error("Google sign-up failed", {
         description: "Please try again later.",
       });
-    } finally {
       setIsLoading(false);
     }
   };
