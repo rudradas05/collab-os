@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { motion } from "motion/react";
 import { toast } from "sonner";
-import { Mail, Lock, ArrowRight, Sparkles } from "lucide-react";
+import { Mail, Lock, ArrowRight, Sparkles, Loader2 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -95,7 +95,47 @@ export default function SignInPage() {
   };
 
   return (
-    <div className="flex min-h-screen bg-linear-to-br from-white via-blue-50/30 to-white">
+    <div className="flex min-h-screen bg-linear-to-br from-white via-blue-50/30 to-white relative">
+      {/* Loading Overlay */}
+      {isLoading && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="flex flex-col items-center gap-4"
+          >
+            <div className="relative">
+              <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              </div>
+              <motion.div
+                animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                className="absolute -inset-2 rounded-2xl bg-primary/5 -z-10"
+              />
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold text-foreground">
+                Signing you in...
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Please wait a moment
+              </p>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
       {/* Left side - Branding */}
       <div className="hidden lg:flex lg:w-1/2 items-center justify-center p-12 bg-linear-to-br from-primary/5 via-primary/10 to-primary/5">
         <motion.div

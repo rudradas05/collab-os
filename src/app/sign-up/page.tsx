@@ -12,6 +12,7 @@ import {
   ArrowRight,
   Sparkles,
   CheckCircle,
+  Loader2,
 } from "lucide-react";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -109,7 +110,47 @@ export default function SignUpPage() {
   ];
 
   return (
-    <div className="flex min-h-screen bg-linear-to-br from-white via-blue-50/30 to-white">
+    <div className="flex min-h-screen bg-linear-to-br from-white via-blue-50/30 to-white relative">
+      {/* Loading Overlay */}
+      {isLoading && (
+        <motion.div
+          initial={{ opacity: 0 }}
+          animate={{ opacity: 1 }}
+          exit={{ opacity: 0 }}
+          className="fixed inset-0 z-50 flex items-center justify-center bg-white/80 backdrop-blur-sm"
+        >
+          <motion.div
+            initial={{ scale: 0.8, opacity: 0 }}
+            animate={{ scale: 1, opacity: 1 }}
+            transition={{ duration: 0.3 }}
+            className="flex flex-col items-center gap-4"
+          >
+            <div className="relative">
+              <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center">
+                <Loader2 className="h-8 w-8 text-primary animate-spin" />
+              </div>
+              <motion.div
+                animate={{ scale: [1, 1.2, 1], opacity: [0.5, 0.8, 0.5] }}
+                transition={{
+                  duration: 2,
+                  repeat: Infinity,
+                  ease: "easeInOut",
+                }}
+                className="absolute -inset-2 rounded-2xl bg-primary/5 -z-10"
+              />
+            </div>
+            <div className="text-center">
+              <p className="text-lg font-semibold text-foreground">
+                Creating your account...
+              </p>
+              <p className="text-sm text-muted-foreground mt-1">
+                Please wait a moment
+              </p>
+            </div>
+          </motion.div>
+        </motion.div>
+      )}
+
       {/* Left side - Form */}
       <div className="flex-1 flex items-center justify-center p-6 lg:p-12">
         <motion.div
